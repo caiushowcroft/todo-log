@@ -178,6 +178,12 @@ fn handle_log_entry_input(app: &mut App, key: KeyCode, modifiers: KeyModifiers) 
         KeyCode::Right => {
             app.move_cursor_right();
         }
+        KeyCode::Up => {
+            app.move_cursor_up();
+        }
+        KeyCode::Down => {
+            app.move_cursor_down();
+        }
         KeyCode::Home => {
             app.log_cursor_pos = 0;
         }

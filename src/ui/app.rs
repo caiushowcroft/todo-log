@@ -390,6 +390,68 @@ impl App {
         }
     }
 
+    /// Move cursor up one line
+    pub fn move_cursor_up(&mut self) {
+        let content = &self.current_log.content;
+        let before_cursor: String = content.chars().take(self.log_cursor_pos).collect();
+        let lines: Vec<&str> = before_cursor.split('\n').collect();
+
+        if lines.len() <= 1 {
+            // Already on first line
+            return;
+        }
+
+        let current_line_idx = lines.len() - 1;
+        let current_col = lines[current_line_idx].chars().count();
+
+        // Get previous line
+        let prev_line = lines[current_line_idx - 1];
+        let prev_line_len = prev_line.chars().count();
+
+        // Move to same column on previous line (or end of line if shorter)
+        let target_col = current_col.min(prev_line_len);
+
+        // Calculate new cursor position
+        let chars_before_prev_line: usize = lines[..current_line_idx - 1]
+            .iter()
+            .map(|l| l.chars().count() + 1) // +1 for newline
+            .sum();
+
+        self.log_cursor_pos = chars_before_prev_line + target_col;
+    }
+
+    /// Move cursor down one line
+    pub fn move_cursor_down(&mut self) {
+        let content = &self.current_log.content;
+        let all_lines: Vec<&str> = content.split('\n').collect();
+
+        // Find current line and column
+        let before_cursor: String = content.chars().take(self.log_cursor_pos).collect();
+        let lines_before: Vec<&str> = before_cursor.split('\n').collect();
+        let current_line_idx = lines_before.len() - 1;
+        let current_col = lines_before[current_line_idx].chars().count();
+
+        if current_line_idx >= all_lines.len() - 1 {
+            // Already on last line
+            return;
+        }
+
+        // Get next line
+        let next_line = all_lines[current_line_idx + 1];
+        let next_line_len = next_line.chars().count();
+
+        // Move to same column on next line (or end of line if shorter)
+        let target_col = current_col.min(next_line_len);
+
+        // Calculate new cursor position
+        let chars_before_next_line: usize = all_lines[..=current_line_idx]
+            .iter()
+            .map(|l| l.chars().count() + 1) // +1 for newline
+            .sum();
+
+        self.log_cursor_pos = chars_before_next_line + target_col;
+    }
+
     /// Add an attachment
     pub fn add_attachment(&mut self, path: PathBuf) {
         if path.exists() {
