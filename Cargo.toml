@@ -1,0 +1,28 @@
+[package]
+name = "todo-log"
+version = "0.1.0"
+edition = "2021"
+description = "A terminal application for managing projects and todos through daily logs"
+
+[dependencies]
+# TUI framework
+ratatui = "0.29"
+crossterm = "0.28"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+
+# Date/time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# File system utilities
+dirs = "5.0"
+walkdir = "2.5"
+
+# Unicode text handling
+unicode-width = "0.1"
