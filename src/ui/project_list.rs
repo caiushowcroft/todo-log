@@ -154,6 +154,24 @@ fn render_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
         }
     });
 
+    // Calculate available width for description
+    // Account for: indent(2) + bullet(2) + separator(3) + space(1) + status(10) + borders(2) + padding(2)
+    let available_width = area.width.saturating_sub(2); // Account for block borders
+    let fixed_overhead = 20; // indent + bullet + separator + space + status + padding
+
+    // Find the longest project name to determine name column width
+    let max_name_len = app.filtered_projects.iter()
+        .map(|p| p.name.len())
+        .max()
+        .unwrap_or(20)
+        .min(30); // Cap at 30 chars
+
+    // Calculate description width
+    let desc_width = available_width
+        .saturating_sub(fixed_overhead)
+        .saturating_sub(max_name_len as u16)
+        .max(30) as usize; // Minimum 30 chars for description
+
     let mut items: Vec<ListItem> = Vec::new();
     let mut current_index = 0;
 
@@ -176,16 +194,17 @@ fn render_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
                 Style::default()
             };
 
-            let desc = project.description.as_ref()
-                .map(|d| {
-                    let preview: String = d.chars().take(60).collect();
-                    if d.len() > 60 {
-                        format!("{}", preview)
-                    } else {
-                        preview
-                    }
-                })
-                .unwrap_or_else(|| "(no description)".to_string());
+            // Format description to fixed width
+            let desc_raw = project.description.as_ref()
+                .map(|d| d.as_str())
+                .unwrap_or("(no description)");
+
+            // Truncate or pad description to exact width
+            let desc: String = if desc_raw.len() > desc_width {
+                format!("{:width$}", desc_raw.chars().take(desc_width - 3).collect::<String>() + "...", width = desc_width)
+            } else {
+                format!("{:width$}", desc_raw, width = desc_width)
+            };
 
             let status_color = match project.status.as_str() {
                 "open" => Color::Green,
@@ -193,9 +212,12 @@ fn render_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
                 _ => Color::Yellow,
             };
 
+            // Format project name to fixed width
+            let name_formatted = format!("{:width$}", project.name, width = max_name_len);
+
             items.push(ListItem::new(Line::from(vec![
                 Span::raw("  "),
-                Span::styled(format!("• {}", project.name), text_style.add_modifier(Modifier::BOLD)),
+                Span::styled(format!("• {}", name_formatted), text_style.add_modifier(Modifier::BOLD)),
                 Span::raw(" - "),
                 Span::styled(desc, text_style.fg(Color::DarkGray)),
                 Span::raw(" "),
