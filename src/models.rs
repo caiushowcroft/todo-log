@@ -12,6 +12,8 @@ pub struct Project {
     pub description: Option<String>,
     #[serde(default = "default_status")]
     pub status: String,
+    #[serde(default)]
+    pub group: String,
 }
 
 fn default_status() -> String {
@@ -25,6 +27,7 @@ impl Project {
             jira: Some("https://jira.com/projects/WWW-123".to_string()),
             description: Some("A project to create a new look on our website".to_string()),
             status: "open".to_string(),
+            group: String::new(),
         }
     }
 }

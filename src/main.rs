@@ -50,6 +50,8 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                 Screen::TodoList => ui::todo_list::render(f, app, area),
                 Screen::LogList => ui::log_list::render(f, app, area),
                 Screen::ViewLog(path) => ui::log_list::render_view_log(f, app, area, path),
+                Screen::ProjectList => ui::project_list::render(f, app, area),
+                Screen::ProjectEdit(_) => ui::project_edit::render(f, app, area),
             }
         })?;
 
@@ -67,6 +69,8 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                     Screen::TodoList => handle_todo_list_input(app, key.code)?,
                     Screen::LogList => handle_log_list_input(app, key.code),
                     Screen::ViewLog(_) => handle_view_log_input(app, key.code),
+                    Screen::ProjectList => handle_project_list_input(app, key.code)?,
+                    Screen::ProjectEdit(_) => handle_project_edit_input(app, key.code, key.modifiers)?,
                 }
             }
         }
@@ -81,6 +85,9 @@ fn handle_menu_input(app: &mut App, key: KeyCode) {
         }
         KeyCode::Char('s') => {
             let _ = app.show_logs();
+        }
+        KeyCode::Char('p') => {
+            let _ = app.show_projects();
         }
         KeyCode::Char('q') => app.quit(),
         KeyCode::Esc => app.quit(),
@@ -521,4 +528,128 @@ fn handle_view_log_input(app: &mut App, key: KeyCode) {
         }
         _ => {}
     }
+}
+
+fn handle_project_list_input(app: &mut App, key: KeyCode) -> Result<()> {
+    // Handle filter panel input if one is open
+    if app.project_filter_panel == ui::app::ProjectFilterPanel::Groups {
+        handle_project_group_filter_input(app, key);
+        return Ok(());
+    }
+
+    // Normal project list navigation
+    match key {
+        KeyCode::Esc => {
+            app.go_to_screen(ui::app::Screen::Menu);
+        }
+        KeyCode::Up => {
+            if app.project_selected > 0 {
+                app.project_selected -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if app.project_selected < app.filtered_projects.len().saturating_sub(1) {
+                app.project_selected += 1;
+            }
+        }
+        KeyCode::Enter => {
+            app.start_edit_project();
+        }
+        KeyCode::Char('g') => {
+            // Open groups filter
+            app.project_filter_group_selected = 0;
+            app.project_filter_panel = ui::app::ProjectFilterPanel::Groups;
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_project_group_filter_input(app: &mut App, key: KeyCode) {
+    let all_groups = app.all_group_names();
+
+    match key {
+        KeyCode::Esc => {
+            app.project_filter_panel = ui::app::ProjectFilterPanel::None;
+            app.project_selected = 0;
+        }
+        KeyCode::Up => {
+            if app.project_filter_group_selected > 0 {
+                app.project_filter_group_selected -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if app.project_filter_group_selected < all_groups.len().saturating_sub(1) {
+                app.project_filter_group_selected += 1;
+            }
+        }
+        KeyCode::Char('x') => {
+            // Toggle the selected group
+            if let Some(group) = all_groups.get(app.project_filter_group_selected) {
+                app.toggle_project_filter_group(group);
+            }
+            app.project_selected = 0;
+        }
+        _ => {}
+    }
+}
+
+fn handle_project_edit_input(app: &mut App, key: KeyCode, modifiers: KeyModifiers) -> Result<()> {
+    // Check for Ctrl combinations
+    if modifiers.contains(KeyModifiers::CONTROL) {
+        match key {
+            KeyCode::Char('s') => {
+                app.save_edited_project()?;
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
+    match key {
+        KeyCode::Esc => {
+            app.go_back();
+        }
+        KeyCode::Char('1') => {
+            app.project_edit_field = 0;
+        }
+        KeyCode::Char('2') => {
+            app.project_edit_field = 1;
+        }
+        KeyCode::Char('3') => {
+            app.project_edit_field = 2;
+        }
+        KeyCode::Char('4') => {
+            app.project_edit_field = 3;
+        }
+        KeyCode::Char('5') => {
+            app.project_edit_field = 4;
+        }
+        KeyCode::Char(c) => {
+            // Insert character into current field
+            match app.project_edit_field {
+                0 => app.project_edit_name.push(c),
+                1 => app.project_edit_description.push(c),
+                2 => app.project_edit_jira.push(c),
+                3 => app.project_edit_status.push(c),
+                4 => app.project_edit_group.push(c),
+                _ => {}
+            }
+        }
+        KeyCode::Backspace => {
+            // Delete character from current field
+            match app.project_edit_field {
+                0 => { app.project_edit_name.pop(); }
+                1 => { app.project_edit_description.pop(); }
+                2 => { app.project_edit_jira.pop(); }
+                3 => { app.project_edit_status.pop(); }
+                4 => { app.project_edit_group.pop(); }
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
 }

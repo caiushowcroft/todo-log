@@ -74,6 +74,16 @@ impl Storage {
         Ok(projects)
     }
 
+    /// Save projects to the projects.yml file
+    pub fn save_projects(&self, projects: &[Project]) -> Result<()> {
+        let path = self.projects_file();
+        let yaml = serde_yaml::to_string(projects)
+            .context("Failed to serialize projects")?;
+        fs::write(&path, yaml)
+            .context("Failed to write projects.yml")?;
+        Ok(())
+    }
+
     /// Load all people from the people.yml file
     pub fn load_people(&self) -> Result<Vec<Person>> {
         let path = self.people_file();

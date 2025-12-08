@@ -43,6 +43,11 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
             Span::raw(" Show logs by project/person"),
         ]),
         Line::from(""),
+        Line::from(vec![
+            Span::styled("[p]", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::raw(" View projects"),
+        ]),
+        Line::from(""),
         Line::from(""),
         Line::from(vec![
             Span::styled("[q]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),

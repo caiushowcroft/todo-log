@@ -11,6 +11,8 @@ pub enum Screen {
     TodoList,
     LogList,
     ViewLog(PathBuf),
+    ProjectList,
+    ProjectEdit(usize), // Index in projects list
 }
 
 /// Main application state
@@ -66,6 +68,22 @@ pub struct App {
     pub log_filter_project_selected: usize,
     pub log_filter_people_selected: usize,
 
+    // Project list state
+    pub project_selected: usize,
+    pub filtered_projects: Vec<Project>,
+    pub project_filter_groups: Vec<String>,
+    pub project_filter_panel: ProjectFilterPanel,
+    pub project_filter_group_selected: usize,
+
+    // Project edit state
+    pub editing_project: Option<Project>,
+    pub project_edit_field: usize, // 0=name, 1=description, 2=jira, 3=status, 4=group
+    pub project_edit_name: String,
+    pub project_edit_description: String,
+    pub project_edit_jira: String,
+    pub project_edit_status: String,
+    pub project_edit_group: String,
+
     // Status message
     pub status_message: Option<String>,
 }
@@ -94,6 +112,12 @@ pub enum TodoFilterPanel {
     Completed,
     Projects,
     People,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ProjectFilterPanel {
+    None,
+    Groups,
 }
 
 /// A file or directory entry in the file browser
@@ -156,6 +180,20 @@ impl App {
             end_date_input: String::new(),
             log_filter_project_selected: 0,
             log_filter_people_selected: 0,
+
+            project_selected: 0,
+            filtered_projects: Vec::new(),
+            project_filter_groups: Vec::new(),
+            project_filter_panel: ProjectFilterPanel::None,
+            project_filter_group_selected: 0,
+
+            editing_project: None,
+            project_edit_field: 0,
+            project_edit_name: String::new(),
+            project_edit_description: String::new(),
+            project_edit_jira: String::new(),
+            project_edit_status: String::new(),
+            project_edit_group: String::new(),
 
             status_message: None,
         })
@@ -270,6 +308,101 @@ impl App {
             self.view_log_scroll = 0;
             self.go_to_screen(Screen::ViewLog(path));
         }
+    }
+
+    /// Show projects and go to project list screen
+    pub fn show_projects(&mut self) -> Result<()> {
+        self.apply_project_filter();
+        self.project_selected = 0;
+        self.go_to_screen(Screen::ProjectList);
+        Ok(())
+    }
+
+    /// Apply the current project filter
+    pub fn apply_project_filter(&mut self) {
+        self.filtered_projects = self.projects
+            .iter()
+            .filter(|p| {
+                if self.project_filter_groups.is_empty() {
+                    true
+                } else {
+                    self.project_filter_groups.contains(&p.group)
+                }
+            })
+            .cloned()
+            .collect();
+    }
+
+    /// Get all unique group names from projects
+    pub fn all_group_names(&self) -> Vec<String> {
+        let mut groups: Vec<String> = self.projects
+            .iter()
+            .map(|p| p.group.clone())
+            .collect();
+        groups.sort();
+        groups.dedup();
+        // Move empty string to the end if it exists
+        if let Some(pos) = groups.iter().position(|g| g.is_empty()) {
+            groups.remove(pos);
+            groups.push(String::from("(No group)"));
+        }
+        groups
+    }
+
+    /// Toggle a group in the project filter
+    pub fn toggle_project_filter_group(&mut self, group: &str) {
+        // Convert "(No group)" back to empty string
+        let group = if group == "(No group)" { "" } else { group };
+
+        if let Some(pos) = self.project_filter_groups.iter().position(|g| g == group) {
+            self.project_filter_groups.remove(pos);
+        } else {
+            self.project_filter_groups.push(group.to_string());
+        }
+        self.apply_project_filter();
+    }
+
+    /// Start editing the selected project
+    pub fn start_edit_project(&mut self) {
+        if let Some(project) = self.filtered_projects.get(self.project_selected).cloned() {
+            self.project_edit_name = project.name.clone();
+            self.project_edit_description = project.description.clone().unwrap_or_default();
+            self.project_edit_jira = project.jira.clone().unwrap_or_default();
+            self.project_edit_status = project.status.clone();
+            self.project_edit_group = project.group.clone();
+            self.project_edit_field = 0;
+
+            // Find the index in the original projects list
+            if let Some(idx) = self.projects.iter().position(|p| p.name == project.name) {
+                self.go_to_screen(Screen::ProjectEdit(idx));
+            }
+        }
+    }
+
+    /// Save the edited project
+    pub fn save_edited_project(&mut self) -> Result<()> {
+        if let Screen::ProjectEdit(idx) = self.screen {
+            if let Some(project) = self.projects.get_mut(idx) {
+                project.name = self.project_edit_name.clone();
+                project.description = if self.project_edit_description.is_empty() {
+                    None
+                } else {
+                    Some(self.project_edit_description.clone())
+                };
+                project.jira = if self.project_edit_jira.is_empty() {
+                    None
+                } else {
+                    Some(self.project_edit_jira.clone())
+                };
+                project.status = self.project_edit_status.clone();
+                project.group = self.project_edit_group.clone();
+
+                self.storage.save_projects(&self.projects)?;
+                self.status_message = Some("Project saved".to_string());
+                self.go_back();
+            }
+        }
+        Ok(())
     }
 
     /// Update autocomplete suggestions based on current input
