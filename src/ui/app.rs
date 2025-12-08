@@ -312,6 +312,8 @@ impl App {
 
     /// Show projects and go to project list screen
     pub fn show_projects(&mut self) -> Result<()> {
+        // Reload projects from file to ensure we have the latest data
+        self.projects = self.storage.load_projects()?;
         self.apply_project_filter();
         self.project_selected = 0;
         self.go_to_screen(Screen::ProjectList);
@@ -398,6 +400,13 @@ impl App {
                 project.group = self.project_edit_group.clone();
 
                 self.storage.save_projects(&self.projects)?;
+
+                // Reload projects from file to ensure consistency
+                self.projects = self.storage.load_projects()?;
+
+                // Reapply the project filter to update the view
+                self.apply_project_filter();
+
                 self.status_message = Some("Project saved".to_string());
                 self.go_back();
             }
