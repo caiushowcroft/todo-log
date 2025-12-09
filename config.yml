@@ -1,0 +1,10 @@
+projects:
+  allowed_states:
+     open: blue
+     close: red
+     hold: yellow
+  groups:
+     - data
+     - infra
+     - money
+     
