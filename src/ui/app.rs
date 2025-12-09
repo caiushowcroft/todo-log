@@ -377,6 +377,33 @@ impl App {
             })
             .cloned()
             .collect();
+
+        // Sort filtered projects to match the visual display order (grouped and sorted)
+        self.sort_filtered_projects_by_display_order();
+    }
+
+    /// Sort filtered projects to match the display order (grouped, then sorted by group)
+    fn sort_filtered_projects_by_display_order(&mut self) {
+        self.filtered_projects.sort_by(|a, b| {
+            let group_a = if a.group.is_empty() { "(No group)" } else { a.group.as_str() };
+            let group_b = if b.group.is_empty() { "(No group)" } else { b.group.as_str() };
+
+            // Sort groups alphabetically, with "(No group)" last
+            let group_order = if group_a == "(No group)" && group_b != "(No group)" {
+                std::cmp::Ordering::Greater
+            } else if group_b == "(No group)" && group_a != "(No group)" {
+                std::cmp::Ordering::Less
+            } else {
+                group_a.cmp(group_b)
+            };
+
+            // If in the same group, maintain original order
+            if group_order == std::cmp::Ordering::Equal {
+                std::cmp::Ordering::Equal
+            } else {
+                group_order
+            }
+        });
     }
 
     /// Get all unique group names from projects
