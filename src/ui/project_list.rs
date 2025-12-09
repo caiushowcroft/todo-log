@@ -205,11 +205,7 @@ fn render_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
                 format!("{:width$}", desc_raw, width = desc_width)
             };
 
-            let status_color = match project.status.as_str() {
-                "open" => Color::Green,
-                "closed" => Color::Gray,
-                _ => Color::Yellow,
-            };
+            let status_color = app.config.get_state_color(&project.status);
 
             // Format project name to fixed width
             let name_formatted = format!("{:width$}", project.name, width = max_name_len);

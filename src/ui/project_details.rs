@@ -21,7 +21,7 @@ pub fn render(frame: &mut Frame, app: &mut App, area: Rect, project_idx: usize) 
 
     // Render project info
     if let Some(project) = app.projects.get(project_idx) {
-        render_project_info(frame, project, chunks[0]);
+        render_project_info(frame, app, project, chunks[0]);
     }
 
     // Render log list
@@ -43,7 +43,7 @@ pub fn render(frame: &mut Frame, app: &mut App, area: Rect, project_idx: usize) 
     frame.render_widget(help, chunks[2]);
 }
 
-fn render_project_info(frame: &mut Frame, project: &crate::models::Project, area: Rect) {
+fn render_project_info(frame: &mut Frame, app: &App, project: &crate::models::Project, area: Rect) {
     let info_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -63,11 +63,7 @@ fn render_project_info(frame: &mut Frame, project: &crate::models::Project, area
         .split(info_chunks[0]);
 
     // Name and status
-    let status_color = match project.status.as_str() {
-        "open" => Color::Green,
-        "closed" => Color::Gray,
-        _ => Color::Yellow,
-    };
+    let status_color = app.config.get_state_color(&project.status);
     let name_line = Line::from(vec![
         Span::styled(&project.name, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
         Span::raw(" "),

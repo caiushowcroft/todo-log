@@ -1,4 +1,4 @@
-use crate::models::{LogEntry, Person, Project, Todo};
+use crate::models::{Config, LogEntry, Person, Project, Todo};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
@@ -32,6 +32,10 @@ impl Storage {
         self.base_dir.join("people.yml")
     }
 
+    pub fn config_file(&self) -> PathBuf {
+        self.base_dir.join("config.yml")
+    }
+
     /// Initialize the storage directory with example files if it doesn't exist
     pub fn initialize(&self) -> Result<()> {
         if !self.base_dir.exists() {
@@ -49,6 +53,12 @@ impl Storage {
             let people_yaml = serde_yaml::to_string(&example_people)?;
             fs::write(self.people_file(), people_yaml)
                 .context("Failed to create people.yml")?;
+
+            // Create example config.yml
+            let example_config = Config::default();
+            let config_yaml = serde_yaml::to_string(&example_config)?;
+            fs::write(self.config_file(), config_yaml)
+                .context("Failed to create config.yml")?;
         }
 
         Ok(())
@@ -102,6 +112,27 @@ impl Storage {
             .context("Failed to parse people.yml")?;
 
         Ok(people)
+    }
+
+    /// Load configuration from config.yml file
+    pub fn load_config(&self) -> Result<Config> {
+        let path = self.config_file();
+        if !path.exists() {
+            // Return default config if file doesn't exist
+            return Ok(Config::default());
+        }
+
+        let content = fs::read_to_string(&path)
+            .context("Failed to read config.yml")?;
+
+        if content.trim().is_empty() {
+            return Ok(Config::default());
+        }
+
+        let config: Config = serde_yaml::from_str(&content)
+            .context("Failed to parse config.yml")?;
+
+        Ok(config)
     }
 
     /// Save a log entry to disk

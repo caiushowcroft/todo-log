@@ -1,4 +1,4 @@
-use crate::models::{LogEntry, LogFilter, Person, Project, Todo, TodoFilter};
+use crate::models::{Config, LogEntry, LogFilter, Person, Project, Todo, TodoFilter};
 use crate::storage::Storage;
 use anyhow::Result;
 use std::path::PathBuf;
@@ -25,6 +25,7 @@ pub struct App {
     pub menu_selected: usize,
 
     // Data
+    pub config: Config,
     pub projects: Vec<Project>,
     pub people: Vec<Person>,
     pub todos: Vec<Todo>,
@@ -89,6 +90,10 @@ pub struct App {
     pub project_edit_jira: String,
     pub project_edit_status: String,
     pub project_edit_group: String,
+    pub project_edit_status_dropdown_open: bool,
+    pub project_edit_status_dropdown_selected: usize,
+    pub project_edit_group_dropdown_open: bool,
+    pub project_edit_group_dropdown_selected: usize,
 
     // Status message
     pub status_message: Option<String>,
@@ -140,6 +145,7 @@ impl App {
         let storage = Storage::new()?;
         storage.initialize()?;
 
+        let config = storage.load_config().unwrap_or_default();
         let projects = storage.load_projects().unwrap_or_default();
         let people = storage.load_people().unwrap_or_default();
 
@@ -150,6 +156,7 @@ impl App {
             running: true,
             menu_selected: 0,
 
+            config,
             projects,
             people,
             todos: Vec::new(),
@@ -204,6 +211,10 @@ impl App {
             project_edit_jira: String::new(),
             project_edit_status: String::new(),
             project_edit_group: String::new(),
+            project_edit_status_dropdown_open: false,
+            project_edit_status_dropdown_selected: 0,
+            project_edit_group_dropdown_open: false,
+            project_edit_group_dropdown_selected: 0,
 
             status_message: None,
         })
@@ -426,6 +437,29 @@ impl App {
                 self.project_edit_status = project.status.clone();
                 self.project_edit_group = project.group.clone();
                 self.project_edit_field = 0;
+
+                // Initialize dropdown selected indices
+                let states = self.config.allowed_state_names();
+                self.project_edit_status_dropdown_selected = states
+                    .iter()
+                    .position(|s| s == &project.status)
+                    .unwrap_or(0);
+
+                let mut groups = self.config.allowed_groups();
+                groups.insert(0, "(no group)".to_string());
+                let group_to_find = if project.group.is_empty() {
+                    "(no group)"
+                } else {
+                    &project.group
+                };
+                self.project_edit_group_dropdown_selected = groups
+                    .iter()
+                    .position(|g| g == group_to_find)
+                    .unwrap_or(0);
+
+                self.project_edit_status_dropdown_open = false;
+                self.project_edit_group_dropdown_open = false;
+
                 self.go_to_screen(Screen::ProjectEdit(idx));
             }
         }
@@ -440,6 +474,28 @@ impl App {
             self.project_edit_status = project.status.clone();
             self.project_edit_group = project.group.clone();
             self.project_edit_field = 0;
+
+            // Initialize dropdown selected indices
+            let states = self.config.allowed_state_names();
+            self.project_edit_status_dropdown_selected = states
+                .iter()
+                .position(|s| s == &project.status)
+                .unwrap_or(0);
+
+            let mut groups = self.config.allowed_groups();
+            groups.insert(0, "(no group)".to_string());
+            let group_to_find = if project.group.is_empty() {
+                "(no group)"
+            } else {
+                &project.group
+            };
+            self.project_edit_group_dropdown_selected = groups
+                .iter()
+                .position(|g| g == group_to_find)
+                .unwrap_or(0);
+
+            self.project_edit_status_dropdown_open = false;
+            self.project_edit_group_dropdown_open = false;
 
             // Find the index in the original projects list
             if let Some(idx) = self.projects.iter().position(|p| p.name == project.name) {

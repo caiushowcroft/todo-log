@@ -2,7 +2,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
@@ -63,26 +63,38 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         .block(Block::default().borders(Borders::ALL).title("[3] Jira URL"));
     frame.render_widget(jira_field, chunks[3]);
 
-    // Status field (field 3)
+    // Status field (field 3) - dropdown
     let status_style = if app.project_edit_field == 3 {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
-    let status_field = Paragraph::new(app.project_edit_status.as_str())
+    let status_display = if app.project_edit_status.is_empty() {
+        "(select status)".to_string()
+    } else {
+        app.project_edit_status.clone()
+    };
+    let status_text = format!("{} {}", status_display, if app.project_edit_field == 3 { "▼" } else { "" });
+    let status_field = Paragraph::new(status_text)
         .style(status_style)
-        .block(Block::default().borders(Borders::ALL).title("[4] Status"));
+        .block(Block::default().borders(Borders::ALL).title("[4] Status (↑↓ to select, Enter to confirm)"));
     frame.render_widget(status_field, chunks[4]);
 
-    // Group field (field 4)
+    // Group field (field 4) - dropdown
     let group_style = if app.project_edit_field == 4 {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
-    let group_field = Paragraph::new(app.project_edit_group.as_str())
+    let group_display = if app.project_edit_group.is_empty() {
+        "(no group)".to_string()
+    } else {
+        app.project_edit_group.clone()
+    };
+    let group_text = format!("{} {}", group_display, if app.project_edit_field == 4 { "▼" } else { "" });
+    let group_field = Paragraph::new(group_text)
         .style(group_style)
-        .block(Block::default().borders(Borders::ALL).title("[5] Group"));
+        .block(Block::default().borders(Borders::ALL).title("[5] Group (↑↓ to select, Enter to confirm)"));
     frame.render_widget(group_field, chunks[5]);
 
     // Help bar
@@ -100,19 +112,119 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(help, chunks[7]);
 
-    // Set cursor position for active field
-    let (field_area, input) = match app.project_edit_field {
-        0 => (chunks[1], &app.project_edit_name),
-        1 => (chunks[2], &app.project_edit_description),
-        2 => (chunks[3], &app.project_edit_jira),
-        3 => (chunks[4], &app.project_edit_status),
-        4 => (chunks[5], &app.project_edit_group),
-        _ => (chunks[1], &app.project_edit_name),
-    };
+    // Set cursor position for active field (only for text input fields, not dropdowns)
+    if app.project_edit_field < 3 {
+        let (field_area, input) = match app.project_edit_field {
+            0 => (chunks[1], &app.project_edit_name),
+            1 => (chunks[2], &app.project_edit_description),
+            2 => (chunks[3], &app.project_edit_jira),
+            _ => (chunks[1], &app.project_edit_name),
+        };
 
-    let inner = field_area.inner(ratatui::layout::Margin { vertical: 1, horizontal: 1 });
-    frame.set_cursor_position((
-        inner.x + input.len() as u16,
-        inner.y,
-    ));
+        let inner = field_area.inner(ratatui::layout::Margin { vertical: 1, horizontal: 1 });
+        frame.set_cursor_position((
+            inner.x + input.len() as u16,
+            inner.y,
+        ));
+    }
+
+    // Render dropdowns if open
+    if app.project_edit_field == 3 && app.project_edit_status_dropdown_open {
+        render_status_dropdown(frame, app, chunks[4]);
+    }
+    if app.project_edit_field == 4 && app.project_edit_group_dropdown_open {
+        render_group_dropdown(frame, app, chunks[5]);
+    }
+}
+
+fn render_status_dropdown(frame: &mut Frame, app: &App, field_area: Rect) {
+    let states = app.config.allowed_state_names();
+    if states.is_empty() {
+        return;
+    }
+
+    // Calculate dropdown position (below the field)
+    let dropdown_height = (states.len() as u16 + 2).min(10); // +2 for borders, max 10
+    let dropdown_width = field_area.width;
+    let dropdown_x = field_area.x;
+    let dropdown_y = field_area.y + field_area.height;
+
+    // Make sure dropdown fits on screen
+    let dropdown_area = Rect::new(dropdown_x, dropdown_y, dropdown_width, dropdown_height);
+
+    frame.render_widget(Clear, dropdown_area);
+
+    let items: Vec<ListItem> = states
+        .iter()
+        .enumerate()
+        .map(|(i, state)| {
+            let state_color = app.config.get_state_color(state);
+            let style = if i == app.project_edit_status_dropdown_selected {
+                Style::default().bg(Color::DarkGray).fg(Color::White)
+            } else {
+                Style::default().fg(state_color)
+            };
+            ListItem::new(Line::from(Span::styled(state.as_str(), style)))
+        })
+        .collect();
+
+    let mut state = ListState::default();
+    state.select(Some(app.project_edit_status_dropdown_selected));
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow)),
+        )
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+
+    frame.render_stateful_widget(list, dropdown_area, &mut state);
+}
+
+fn render_group_dropdown(frame: &mut Frame, app: &App, field_area: Rect) {
+    let mut groups = app.config.allowed_groups();
+    // Add "(no group)" option at the beginning
+    groups.insert(0, "(no group)".to_string());
+
+    if groups.is_empty() {
+        return;
+    }
+
+    // Calculate dropdown position (below the field)
+    let dropdown_height = (groups.len() as u16 + 2).min(10); // +2 for borders, max 10
+    let dropdown_width = field_area.width;
+    let dropdown_x = field_area.x;
+    let dropdown_y = field_area.y + field_area.height;
+
+    // Make sure dropdown fits on screen
+    let dropdown_area = Rect::new(dropdown_x, dropdown_y, dropdown_width, dropdown_height);
+
+    frame.render_widget(Clear, dropdown_area);
+
+    let items: Vec<ListItem> = groups
+        .iter()
+        .enumerate()
+        .map(|(i, group)| {
+            let style = if i == app.project_edit_group_dropdown_selected {
+                Style::default().bg(Color::DarkGray).fg(Color::White)
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(Span::styled(group.as_str(), style)))
+        })
+        .collect();
+
+    let mut state = ListState::default();
+    state.select(Some(app.project_edit_group_dropdown_selected));
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow)),
+        )
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+
+    frame.render_stateful_widget(list, dropdown_area, &mut state);
 }

@@ -675,43 +675,113 @@ fn handle_project_edit_input(app: &mut App, key: KeyCode, modifiers: KeyModifier
             app.go_back();
         }
         KeyCode::Tab => {
+            // Close any open dropdowns
+            app.project_edit_status_dropdown_open = false;
+            app.project_edit_group_dropdown_open = false;
             // Cycle to next field (0-4)
             app.project_edit_field = (app.project_edit_field + 1) % 5;
+            // Open dropdown if moving to status or group field
+            if app.project_edit_field == 3 {
+                app.project_edit_status_dropdown_open = true;
+            } else if app.project_edit_field == 4 {
+                app.project_edit_group_dropdown_open = true;
+            }
         }
         KeyCode::Char('1') => {
+            app.project_edit_status_dropdown_open = false;
+            app.project_edit_group_dropdown_open = false;
             app.project_edit_field = 0;
         }
         KeyCode::Char('2') => {
+            app.project_edit_status_dropdown_open = false;
+            app.project_edit_group_dropdown_open = false;
             app.project_edit_field = 1;
         }
         KeyCode::Char('3') => {
+            app.project_edit_status_dropdown_open = false;
+            app.project_edit_group_dropdown_open = false;
             app.project_edit_field = 2;
         }
         KeyCode::Char('4') => {
+            app.project_edit_status_dropdown_open = false;
+            app.project_edit_group_dropdown_open = false;
             app.project_edit_field = 3;
+            app.project_edit_status_dropdown_open = true;
         }
         KeyCode::Char('5') => {
+            app.project_edit_status_dropdown_open = false;
+            app.project_edit_group_dropdown_open = false;
             app.project_edit_field = 4;
+            app.project_edit_group_dropdown_open = true;
+        }
+        KeyCode::Up => {
+            // Navigate dropdown if on status or group field
+            if app.project_edit_field == 3 {
+                app.project_edit_status_dropdown_open = true;
+                if app.project_edit_status_dropdown_selected > 0 {
+                    app.project_edit_status_dropdown_selected -= 1;
+                }
+            } else if app.project_edit_field == 4 {
+                app.project_edit_group_dropdown_open = true;
+                if app.project_edit_group_dropdown_selected > 0 {
+                    app.project_edit_group_dropdown_selected -= 1;
+                }
+            }
+        }
+        KeyCode::Down => {
+            // Navigate dropdown if on status or group field
+            if app.project_edit_field == 3 {
+                app.project_edit_status_dropdown_open = true;
+                let max = app.config.allowed_state_names().len().saturating_sub(1);
+                if app.project_edit_status_dropdown_selected < max {
+                    app.project_edit_status_dropdown_selected += 1;
+                }
+            } else if app.project_edit_field == 4 {
+                app.project_edit_group_dropdown_open = true;
+                let max = app.config.allowed_groups().len(); // +1 for "(no group)" option, -1 for index
+                if app.project_edit_group_dropdown_selected < max {
+                    app.project_edit_group_dropdown_selected += 1;
+                }
+            }
+        }
+        KeyCode::Enter => {
+            // Confirm dropdown selection
+            if app.project_edit_field == 3 && app.project_edit_status_dropdown_open {
+                let states = app.config.allowed_state_names();
+                if let Some(selected) = states.get(app.project_edit_status_dropdown_selected) {
+                    app.project_edit_status = selected.clone();
+                }
+                app.project_edit_status_dropdown_open = false;
+            } else if app.project_edit_field == 4 && app.project_edit_group_dropdown_open {
+                let mut groups = app.config.allowed_groups();
+                groups.insert(0, "(no group)".to_string());
+                if let Some(selected) = groups.get(app.project_edit_group_dropdown_selected) {
+                    app.project_edit_group = if selected == "(no group)" {
+                        String::new()
+                    } else {
+                        selected.clone()
+                    };
+                }
+                app.project_edit_group_dropdown_open = false;
+            }
         }
         KeyCode::Char(c) => {
-            // Insert character into current field
+            // Insert character into current field (only for text fields, not dropdowns)
             match app.project_edit_field {
                 0 => app.project_edit_name.push(c),
                 1 => app.project_edit_description.push(c),
                 2 => app.project_edit_jira.push(c),
-                3 => app.project_edit_status.push(c),
-                4 => app.project_edit_group.push(c),
+                // Fields 3 and 4 are dropdowns, no character input
                 _ => {}
             }
         }
         KeyCode::Backspace => {
-            // Delete character from current field
+            // Delete character from current field (only for text fields, not dropdowns)
             match app.project_edit_field {
                 0 => { app.project_edit_name.pop(); }
                 1 => { app.project_edit_description.pop(); }
                 2 => { app.project_edit_jira.pop(); }
-                3 => { app.project_edit_status.pop(); }
-                4 => { app.project_edit_group.pop(); }
+                // Fields 3 and 4 are dropdowns, no backspace
                 _ => {}
             }
         }

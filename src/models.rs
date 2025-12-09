@@ -1,5 +1,7 @@
 use chrono::{DateTime, Local, NaiveDate};
+use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// A project that can be tagged in log entries
@@ -295,5 +297,78 @@ impl LogFilter {
         }
 
         true
+    }
+}
+
+/// Configuration for the application
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    pub projects: ProjectConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectConfig {
+    pub allowed_states: HashMap<String, String>, // state name -> color
+    pub groups: Vec<String>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        let mut allowed_states = HashMap::new();
+        allowed_states.insert("open".to_string(), "blue".to_string());
+        allowed_states.insert("closed".to_string(), "red".to_string());
+
+        Self {
+            projects: ProjectConfig {
+                allowed_states,
+                groups: vec![],
+            }
+        }
+    }
+}
+
+impl Config {
+    /// Get list of allowed state names
+    pub fn allowed_state_names(&self) -> Vec<String> {
+        let mut states: Vec<String> = self.projects.allowed_states.keys().cloned().collect();
+        states.sort();
+        states
+    }
+
+    /// Get list of allowed groups
+    pub fn allowed_groups(&self) -> Vec<String> {
+        self.projects.groups.clone()
+    }
+
+    /// Get the color for a given state
+    pub fn get_state_color(&self, state: &str) -> Color {
+        if let Some(color_name) = self.projects.allowed_states.get(state) {
+            Self::parse_color(color_name)
+        } else {
+            Color::Yellow // Default color for unknown states
+        }
+    }
+
+    /// Parse a color name string to a ratatui Color
+    fn parse_color(color_name: &str) -> Color {
+        match color_name.to_lowercase().as_str() {
+            "black" => Color::Black,
+            "red" => Color::Red,
+            "green" => Color::Green,
+            "yellow" => Color::Yellow,
+            "blue" => Color::Blue,
+            "magenta" => Color::Magenta,
+            "cyan" => Color::Cyan,
+            "gray" | "grey" => Color::Gray,
+            "darkgray" | "darkgrey" => Color::DarkGray,
+            "lightred" => Color::LightRed,
+            "lightgreen" => Color::LightGreen,
+            "lightyellow" => Color::LightYellow,
+            "lightblue" => Color::LightBlue,
+            "lightmagenta" => Color::LightMagenta,
+            "lightcyan" => Color::LightCyan,
+            "white" => Color::White,
+            _ => Color::Gray, // Default fallback
+        }
     }
 }
