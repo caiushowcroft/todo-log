@@ -581,11 +581,21 @@ fn handle_project_list_input(app: &mut App, key: KeyCode) -> Result<()> {
         KeyCode::Up => {
             if app.project_selected > 0 {
                 app.project_selected -= 1;
+                // Adjust scroll if selection moves above visible area
+                if app.project_selected < app.project_list_scroll {
+                    app.project_list_scroll = app.project_selected;
+                }
             }
         }
         KeyCode::Down => {
             if app.project_selected < app.filtered_projects.len().saturating_sub(1) {
                 app.project_selected += 1;
+                // Adjust scroll if selection moves below visible area
+                // Assuming roughly 10 visible items (will be refined based on actual area)
+                let visible_items = 10;
+                if app.project_selected >= app.project_list_scroll + visible_items {
+                    app.project_list_scroll = app.project_selected - visible_items + 1;
+                }
             }
         }
         KeyCode::Enter => {

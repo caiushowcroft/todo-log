@@ -73,6 +73,7 @@ pub struct App {
 
     // Project list state
     pub project_selected: usize,
+    pub project_list_scroll: usize,
     pub filtered_projects: Vec<Project>,
     pub project_filter_groups: Vec<String>,
     pub project_filter_panel: ProjectFilterPanel,
@@ -196,6 +197,7 @@ impl App {
             log_filter_people_selected: 0,
 
             project_selected: 0,
+            project_list_scroll: 0,
             filtered_projects: Vec::new(),
             project_filter_groups: Vec::new(),
             project_filter_panel: ProjectFilterPanel::None,
@@ -357,6 +359,7 @@ impl App {
         self.projects = self.storage.load_projects()?;
         self.apply_project_filter();
         self.project_selected = 0;
+        self.project_list_scroll = 0;
         self.go_to_screen(Screen::ProjectList);
         Ok(())
     }

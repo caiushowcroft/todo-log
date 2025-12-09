@@ -174,6 +174,20 @@ fn render_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let mut items: Vec<ListItem> = Vec::new();
     let mut project_index = 0;
+    let mut visual_items_before_scroll = 0usize;
+
+    // Calculate how many visual items (headers + projects) come before the scroll position
+    let mut temp_project_idx = 0;
+    for (_, projects) in &grouped_projects {
+        if temp_project_idx >= app.project_list_scroll {
+            break;
+        }
+        visual_items_before_scroll += 1; // Count the header
+        let projects_in_group = projects.len();
+        let projects_to_count = (app.project_list_scroll - temp_project_idx).min(projects_in_group);
+        visual_items_before_scroll += projects_to_count;
+        temp_project_idx += projects_in_group;
+    }
 
     for (group_name, projects) in &grouped_projects {
         // Add group header
@@ -229,5 +243,12 @@ fn render_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
     let list = List::new(items)
         .block(Block::default().borders(Borders::ALL).title("Project List"));
 
-    frame.render_widget(list, area);
+    // Use ListState to handle scrolling
+    let mut state = ListState::default();
+    state.select(None); // We don't use state selection since we have manual styling
+    if visual_items_before_scroll > 0 {
+        *state.offset_mut() = visual_items_before_scroll;
+    }
+
+    frame.render_stateful_widget(list, area, &mut state);
 }
