@@ -12,6 +12,7 @@ pub enum Screen {
     LogList,
     ViewLog(PathBuf),
     ProjectList,
+    ProjectDetails(usize), // Index in projects list
     ProjectEdit(usize), // Index in projects list
 }
 
@@ -21,6 +22,7 @@ pub struct App {
     pub screen: Screen,
     pub previous_screen: Option<Screen>,
     pub running: bool,
+    pub menu_selected: usize,
 
     // Data
     pub projects: Vec<Project>,
@@ -74,6 +76,10 @@ pub struct App {
     pub project_filter_groups: Vec<String>,
     pub project_filter_panel: ProjectFilterPanel,
     pub project_filter_group_selected: usize,
+
+    // Project details state
+    pub project_details_log_selected: usize,
+    pub project_details_logs: Vec<LogEntry>,
 
     // Project edit state
     pub editing_project: Option<Project>,
@@ -142,6 +148,7 @@ impl App {
             screen: Screen::Menu,
             previous_screen: None,
             running: true,
+            menu_selected: 0,
 
             projects,
             people,
@@ -187,6 +194,9 @@ impl App {
             project_filter_panel: ProjectFilterPanel::None,
             project_filter_group_selected: 0,
 
+            project_details_log_selected: 0,
+            project_details_logs: Vec::new(),
+
             editing_project: None,
             project_edit_field: 0,
             project_edit_name: String::new(),
@@ -205,14 +215,25 @@ impl App {
 
     pub fn go_to_screen(&mut self, screen: Screen) {
         self.previous_screen = Some(self.screen.clone());
-        self.screen = screen;
+        self.screen = screen.clone();
+
+        // Reset menu selection when going to menu
+        if matches!(screen, Screen::Menu) {
+            self.menu_selected = 0;
+        }
     }
 
     pub fn go_back(&mut self) {
         if let Some(prev) = self.previous_screen.take() {
             self.screen = prev;
+
+            // Reset menu selection when going back to menu
+            if matches!(self.screen, Screen::Menu) {
+                self.menu_selected = 0;
+            }
         } else {
             self.screen = Screen::Menu;
+            self.menu_selected = 0;
         }
     }
 
@@ -310,6 +331,15 @@ impl App {
         }
     }
 
+    /// View log from project details screen
+    pub fn view_project_details_log(&mut self) {
+        if let Some(log) = self.project_details_logs.get(self.project_details_log_selected) {
+            let path = log.file_path.clone();
+            self.view_log_scroll = 0;
+            self.go_to_screen(Screen::ViewLog(path));
+        }
+    }
+
     /// Show projects and go to project list screen
     pub fn show_projects(&mut self) -> Result<()> {
         // Reload projects from file to ensure we have the latest data
@@ -362,6 +392,43 @@ impl App {
             self.project_filter_groups.push(group.to_string());
         }
         self.apply_project_filter();
+    }
+
+    /// Show project details for the selected project
+    pub fn show_project_details(&mut self) -> Result<()> {
+        if let Some(project) = self.filtered_projects.get(self.project_selected).cloned() {
+            // Find the index in the original projects list
+            if let Some(idx) = self.projects.iter().position(|p| p.name == project.name) {
+                // Load all logs
+                self.logs = self.storage.load_all_logs()?;
+
+                // Filter logs that contain this project
+                self.project_details_logs = self.logs
+                    .iter()
+                    .filter(|log| log.projects.contains(&project.name))
+                    .cloned()
+                    .collect();
+
+                self.project_details_log_selected = 0;
+                self.go_to_screen(Screen::ProjectDetails(idx));
+            }
+        }
+        Ok(())
+    }
+
+    /// Start editing a project from the details screen
+    pub fn start_edit_project_from_details(&mut self) {
+        if let Screen::ProjectDetails(idx) = self.screen {
+            if let Some(project) = self.projects.get(idx) {
+                self.project_edit_name = project.name.clone();
+                self.project_edit_description = project.description.clone().unwrap_or_default();
+                self.project_edit_jira = project.jira.clone().unwrap_or_default();
+                self.project_edit_status = project.status.clone();
+                self.project_edit_group = project.group.clone();
+                self.project_edit_field = 0;
+                self.go_to_screen(Screen::ProjectEdit(idx));
+            }
+        }
     }
 
     /// Start editing the selected project

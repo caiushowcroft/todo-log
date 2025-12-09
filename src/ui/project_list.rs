@@ -173,9 +173,9 @@ fn render_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
         .max(30) as usize; // Minimum 30 chars for description
 
     let mut items: Vec<ListItem> = Vec::new();
-    let mut current_index = 0;
+    let mut project_index = 0;
 
-    for (group_name, projects) in grouped_projects {
+    for (group_name, projects) in &grouped_projects {
         // Add group header
         items.push(ListItem::new(Line::from(vec![
             Span::styled(
@@ -183,11 +183,10 @@ fn render_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
                 Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             ),
         ])));
-        current_index += 1;
 
         // Add projects in this group
         for project in projects {
-            let is_selected = current_index - 1 == app.project_selected;
+            let is_selected = project_index == app.project_selected;
             let text_style = if is_selected {
                 Style::default().bg(Color::DarkGray).fg(Color::White)
             } else {
@@ -219,37 +218,20 @@ fn render_project_list(frame: &mut Frame, app: &mut App, area: Rect) {
                 Span::raw("  "),
                 Span::styled(format!("• {}", name_formatted), text_style.add_modifier(Modifier::BOLD)),
                 Span::raw(" - "),
-                Span::styled(desc, text_style.fg(Color::DarkGray)),
+                Span::styled(desc, text_style),
                 Span::raw(" "),
                 Span::styled(
                     format!("[{}]", project.status),
                     Style::default().fg(status_color),
                 ),
             ])));
-            current_index += 1;
+            project_index += 1;
         }
     }
 
-    let mut state = ListState::default();
-    // Adjust selected index to skip group headers
-    let mut visual_index = 0;
-    let mut actual_index = 0;
-    for (idx, _item) in items.iter().enumerate() {
-        // Check if this is a project item (not a header)
-        if idx > 0 && visual_index == app.project_selected {
-            actual_index = idx;
-            break;
-        }
-        // Check if this is a project line (starts with "  •")
-        if idx > 0 {
-            visual_index += 1;
-        }
-    }
-    state.select(Some(actual_index));
-
+    // We're using manual styling for selection, so we don't need the List's built-in highlighting
     let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Project List"))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+        .block(Block::default().borders(Borders::ALL).title("Project List"));
 
-    frame.render_stateful_widget(list, area, &mut state);
+    frame.render_widget(list, area);
 }

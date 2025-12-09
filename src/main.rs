@@ -51,6 +51,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                 Screen::LogList => ui::log_list::render(f, app, area),
                 Screen::ViewLog(path) => ui::log_list::render_view_log(f, app, area, path),
                 Screen::ProjectList => ui::project_list::render(f, app, area),
+                Screen::ProjectDetails(idx) => ui::project_details::render(f, app, area, *idx),
                 Screen::ProjectEdit(_) => ui::project_edit::render(f, app, area),
             }
         })?;
@@ -70,6 +71,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                     Screen::LogList => handle_log_list_input(app, key.code),
                     Screen::ViewLog(_) => handle_view_log_input(app, key.code),
                     Screen::ProjectList => handle_project_list_input(app, key.code)?,
+                    Screen::ProjectDetails(_) => handle_project_details_input(app, key.code)?,
                     Screen::ProjectEdit(_) => handle_project_edit_input(app, key.code, key.modifiers)?,
                 }
             }
@@ -79,18 +81,52 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
 
 fn handle_menu_input(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Char('c') => app.start_new_log(),
-        KeyCode::Char('d') => {
+        KeyCode::Up => {
+            if app.menu_selected > 0 {
+                app.menu_selected -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if app.menu_selected < 3 {
+                app.menu_selected += 1;
+            }
+        }
+        KeyCode::Enter => {
+            execute_menu_selection(app, app.menu_selected);
+        }
+        KeyCode::Char('1') => {
+            app.menu_selected = 0;
+            execute_menu_selection(app, 0);
+        }
+        KeyCode::Char('2') => {
+            app.menu_selected = 1;
+            execute_menu_selection(app, 1);
+        }
+        KeyCode::Char('3') => {
+            app.menu_selected = 2;
+            execute_menu_selection(app, 2);
+        }
+        KeyCode::Char('4') => {
+            app.menu_selected = 3;
+            execute_menu_selection(app, 3);
+        }
+        KeyCode::Esc => app.quit(),
+        _ => {}
+    }
+}
+
+fn execute_menu_selection(app: &mut App, selection: usize) {
+    match selection {
+        0 => app.start_new_log(),
+        1 => {
             let _ = app.show_todos();
         }
-        KeyCode::Char('s') => {
+        2 => {
             let _ = app.show_logs();
         }
-        KeyCode::Char('p') => {
+        3 => {
             let _ = app.show_projects();
         }
-        KeyCode::Char('q') => app.quit(),
-        KeyCode::Esc => app.quit(),
         _ => {}
     }
 }
@@ -553,7 +589,7 @@ fn handle_project_list_input(app: &mut App, key: KeyCode) -> Result<()> {
             }
         }
         KeyCode::Enter => {
-            app.start_edit_project();
+            app.show_project_details()?;
         }
         KeyCode::Char('g') => {
             // Open groups filter
@@ -595,6 +631,33 @@ fn handle_project_group_filter_input(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_project_details_input(app: &mut App, key: KeyCode) -> Result<()> {
+    match key {
+        KeyCode::Esc => {
+            app.go_back();
+        }
+        KeyCode::Up => {
+            if app.project_details_log_selected > 0 {
+                app.project_details_log_selected -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if app.project_details_log_selected < app.project_details_logs.len().saturating_sub(1) {
+                app.project_details_log_selected += 1;
+            }
+        }
+        KeyCode::Enter => {
+            app.view_project_details_log();
+        }
+        KeyCode::Char('e') => {
+            app.start_edit_project_from_details();
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
 fn handle_project_edit_input(app: &mut App, key: KeyCode, modifiers: KeyModifiers) -> Result<()> {
     // Check for Ctrl combinations
     if modifiers.contains(KeyModifiers::CONTROL) {
@@ -610,6 +673,10 @@ fn handle_project_edit_input(app: &mut App, key: KeyCode, modifiers: KeyModifier
     match key {
         KeyCode::Esc => {
             app.go_back();
+        }
+        KeyCode::Tab => {
+            // Cycle to next field (0-4)
+            app.project_edit_field = (app.project_edit_field + 1) % 5;
         }
         KeyCode::Char('1') => {
             app.project_edit_field = 0;

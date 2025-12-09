@@ -26,37 +26,32 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(title, chunks[0]);
 
-    // Menu options
-    let menu_items = vec![
-        Line::from(vec![
-            Span::styled("[c]", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::raw(" Create a new log entry"),
-        ]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("[d]", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::raw(" List current todos"),
-        ]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("[s]", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::raw(" Show logs by project/person"),
-        ]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("[p]", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::raw(" View projects"),
-        ]),
-        Line::from(""),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("[q]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-            Span::raw(" Quit"),
-        ]),
+    // Menu options - numbered list with selection
+    let menu_options = [
+        "Create a new log entry",
+        "List current todos",
+        "Show logs by project/person",
+        "View projects",
     ];
 
+    let mut menu_items = Vec::new();
+    for (i, option) in menu_options.iter().enumerate() {
+        let is_selected = i == app.menu_selected;
+        let style = if is_selected {
+            Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+        };
+
+        menu_items.push(Line::from(vec![
+            Span::styled(format!("{}. ", i + 1), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(*option, style),
+        ]));
+        menu_items.push(Line::from(""));
+    }
+
     let menu = Paragraph::new(menu_items)
-        .block(Block::default().borders(Borders::ALL).title("Menu"))
+        .block(Block::default().borders(Borders::ALL).title("Menu (↑↓ to navigate, Enter to select, ESC to quit)"))
         .alignment(Alignment::Left);
     frame.render_widget(menu, chunks[1]);
 

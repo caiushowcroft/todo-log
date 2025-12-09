@@ -87,10 +87,10 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
 
     // Help bar
     let help_text = vec![
+        Span::styled("Tab", Style::default().fg(Color::Yellow)),
+        Span::raw(" Next field  "),
         Span::styled("1-5", Style::default().fg(Color::Yellow)),
-        Span::raw(" Select field  "),
-        Span::styled("Type", Style::default().fg(Color::Yellow)),
-        Span::raw(" to edit  "),
+        Span::raw(" Jump to field  "),
         Span::styled("Ctrl+S", Style::default().fg(Color::Yellow)),
         Span::raw(" Save  "),
         Span::styled("ESC", Style::default().fg(Color::Yellow)),
