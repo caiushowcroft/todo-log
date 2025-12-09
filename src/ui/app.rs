@@ -13,7 +13,7 @@ pub enum Screen {
     ViewLog(PathBuf),
     ProjectList,
     ProjectDetails(usize), // Index in projects list
-    ProjectEdit(usize), // Index in projects list
+    ProjectEdit(Option<usize>), // None = new project, Some(idx) = edit existing
 }
 
 /// Main application state
@@ -490,7 +490,7 @@ impl App {
                 self.project_edit_status_dropdown_open = false;
                 self.project_edit_group_dropdown_open = false;
 
-                self.go_to_screen(Screen::ProjectEdit(idx));
+                self.go_to_screen(Screen::ProjectEdit(Some(idx)));
             }
         }
     }
@@ -529,40 +529,90 @@ impl App {
 
             // Find the index in the original projects list
             if let Some(idx) = self.projects.iter().position(|p| p.name == project.name) {
-                self.go_to_screen(Screen::ProjectEdit(idx));
+                self.go_to_screen(Screen::ProjectEdit(Some(idx)));
             }
         }
     }
 
+    /// Start creating a new project
+    pub fn start_new_project(&mut self) {
+        // Initialize empty fields
+        self.project_edit_name = String::new();
+        self.project_edit_description = String::new();
+        self.project_edit_jira = String::new();
+
+        // Initialize with first available status
+        let states = self.config.allowed_state_names();
+        self.project_edit_status = states.first().cloned().unwrap_or_else(|| "open".to_string());
+        self.project_edit_status_dropdown_selected = 0;
+
+        // Initialize with no group
+        self.project_edit_group = String::new();
+        self.project_edit_group_dropdown_selected = 0; // "(no group)" is at index 0
+
+        self.project_edit_field = 0;
+        self.project_edit_status_dropdown_open = false;
+        self.project_edit_group_dropdown_open = false;
+
+        self.go_to_screen(Screen::ProjectEdit(None));
+    }
+
     /// Save the edited project
     pub fn save_edited_project(&mut self) -> Result<()> {
-        if let Screen::ProjectEdit(idx) = self.screen {
-            if let Some(project) = self.projects.get_mut(idx) {
-                project.name = self.project_edit_name.clone();
-                project.description = if self.project_edit_description.is_empty() {
-                    None
-                } else {
-                    Some(self.project_edit_description.clone())
-                };
-                project.jira = if self.project_edit_jira.is_empty() {
-                    None
-                } else {
-                    Some(self.project_edit_jira.clone())
-                };
-                project.status = self.project_edit_status.clone();
-                project.group = self.project_edit_group.clone();
+        if let Screen::ProjectEdit(idx_opt) = self.screen {
+            match idx_opt {
+                Some(idx) => {
+                    // Editing existing project
+                    if let Some(project) = self.projects.get_mut(idx) {
+                        project.name = self.project_edit_name.clone();
+                        project.description = if self.project_edit_description.is_empty() {
+                            None
+                        } else {
+                            Some(self.project_edit_description.clone())
+                        };
+                        project.jira = if self.project_edit_jira.is_empty() {
+                            None
+                        } else {
+                            Some(self.project_edit_jira.clone())
+                        };
+                        project.status = self.project_edit_status.clone();
+                        project.group = self.project_edit_group.clone();
 
-                self.storage.save_projects(&self.projects)?;
+                        self.storage.save_projects(&self.projects)?;
+                        self.status_message = Some("Project saved".to_string());
+                    }
+                }
+                None => {
+                    // Creating new project
+                    let new_project = Project {
+                        name: self.project_edit_name.clone(),
+                        description: if self.project_edit_description.is_empty() {
+                            None
+                        } else {
+                            Some(self.project_edit_description.clone())
+                        },
+                        jira: if self.project_edit_jira.is_empty() {
+                            None
+                        } else {
+                            Some(self.project_edit_jira.clone())
+                        },
+                        status: self.project_edit_status.clone(),
+                        group: self.project_edit_group.clone(),
+                    };
 
-                // Reload projects from file to ensure consistency
-                self.projects = self.storage.load_projects()?;
-
-                // Reapply the project filter to update the view
-                self.apply_project_filter();
-
-                self.status_message = Some("Project saved".to_string());
-                self.go_back();
+                    self.projects.push(new_project);
+                    self.storage.save_projects(&self.projects)?;
+                    self.status_message = Some("Project created".to_string());
+                }
             }
+
+            // Reload projects from file to ensure consistency
+            self.projects = self.storage.load_projects()?;
+
+            // Reapply the project filter to update the view
+            self.apply_project_filter();
+
+            self.go_back();
         }
         Ok(())
     }

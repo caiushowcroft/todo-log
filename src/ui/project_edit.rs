@@ -24,8 +24,12 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         ])
         .split(area);
 
-    // Title
-    let title = Paragraph::new("Edit Project")
+    // Title - show different text for new vs edit
+    let title_text = match app.screen {
+        super::app::Screen::ProjectEdit(None) => "New Project",
+        _ => "Edit Project",
+    };
+    let title = Paragraph::new(title_text)
         .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(title, chunks[0]);

@@ -606,6 +606,10 @@ fn handle_project_list_input(app: &mut App, key: KeyCode) -> Result<()> {
             app.project_filter_group_selected = 0;
             app.project_filter_panel = ui::app::ProjectFilterPanel::Groups;
         }
+        KeyCode::Char('n') => {
+            // Create new project
+            app.start_new_project();
+        }
         _ => {}
     }
 
