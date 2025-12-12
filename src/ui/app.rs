@@ -707,9 +707,24 @@ impl App {
     /// Save the edited person
     pub fn save_edited_person(&mut self) -> Result<()> {
         if let Screen::PersonEdit(idx_opt) = self.screen {
+            // Validate name is not empty
+            if self.person_edit_name.trim().is_empty() {
+                self.status_message = Some("Error: Name cannot be empty".to_string());
+                return Ok(());
+            }
+
             match idx_opt {
                 Some(idx) => {
-                    // Editing existing person
+                    // Editing existing person - check for duplicate name (excluding self)
+                    let name_exists = self.people.iter().enumerate().any(|(i, p)| {
+                        i != idx && p.name == self.person_edit_name
+                    });
+
+                    if name_exists {
+                        self.status_message = Some(format!("Error: Person '{}' already exists", self.person_edit_name));
+                        return Ok(());
+                    }
+
                     if let Some(person) = self.people.get_mut(idx) {
                         person.name = self.person_edit_name.clone();
                         person.full_name = if self.person_edit_full_name.is_empty() {
@@ -738,7 +753,14 @@ impl App {
                     }
                 }
                 None => {
-                    // Creating new person
+                    // Creating new person - check for duplicate name
+                    let name_exists = self.people.iter().any(|p| p.name == self.person_edit_name);
+
+                    if name_exists {
+                        self.status_message = Some(format!("Error: Person '{}' already exists", self.person_edit_name));
+                        return Ok(());
+                    }
+
                     let new_person = Person {
                         name: self.person_edit_name.clone(),
                         full_name: if self.person_edit_full_name.is_empty() {
