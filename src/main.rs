@@ -53,6 +53,9 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                 Screen::ProjectList => ui::project_list::render(f, app, area),
                 Screen::ProjectDetails(idx) => ui::project_details::render(f, app, area, *idx),
                 Screen::ProjectEdit(_) => ui::project_edit::render(f, app, area),
+                Screen::PeopleList => ui::people_list::render(f, app, area),
+                Screen::PersonDetails(idx) => ui::person_details::render(f, app, area, *idx),
+                Screen::PersonEdit(_) => ui::person_edit::render(f, app, area),
             }
         })?;
 
@@ -73,6 +76,9 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                     Screen::ProjectList => handle_project_list_input(app, key.code)?,
                     Screen::ProjectDetails(_) => handle_project_details_input(app, key.code)?,
                     Screen::ProjectEdit(_) => handle_project_edit_input(app, key.code, key.modifiers)?,
+                    Screen::PeopleList => handle_people_list_input(app, key.code)?,
+                    Screen::PersonDetails(_) => handle_person_details_input(app, key.code)?,
+                    Screen::PersonEdit(_) => handle_person_edit_input(app, key.code, key.modifiers)?,
                 }
             }
         }
@@ -87,7 +93,7 @@ fn handle_menu_input(app: &mut App, key: KeyCode) {
             }
         }
         KeyCode::Down => {
-            if app.menu_selected < 3 {
+            if app.menu_selected < 4 {
                 app.menu_selected += 1;
             }
         }
@@ -110,6 +116,10 @@ fn handle_menu_input(app: &mut App, key: KeyCode) {
             app.menu_selected = 3;
             execute_menu_selection(app, 3);
         }
+        KeyCode::Char('5') => {
+            app.menu_selected = 4;
+            execute_menu_selection(app, 4);
+        }
         KeyCode::Esc => app.quit(),
         _ => {}
     }
@@ -126,6 +136,9 @@ fn execute_menu_selection(app: &mut App, selection: usize) {
         }
         3 => {
             let _ = app.show_projects();
+        }
+        4 => {
+            let _ = app.show_people();
         }
         _ => {}
     }
@@ -796,6 +809,132 @@ fn handle_project_edit_input(app: &mut App, key: KeyCode, modifiers: KeyModifier
                 1 => { app.project_edit_description.pop(); }
                 2 => { app.project_edit_jira.pop(); }
                 // Fields 3 and 4 are dropdowns, no backspace
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_people_list_input(app: &mut App, key: KeyCode) -> Result<()> {
+    match key {
+        KeyCode::Esc => {
+            app.go_to_screen(ui::app::Screen::Menu);
+        }
+        KeyCode::Up => {
+            if app.person_selected > 0 {
+                app.person_selected -= 1;
+                // Adjust scroll if selection moves above visible area
+                if app.person_selected < app.person_list_scroll {
+                    app.person_list_scroll = app.person_selected;
+                }
+            }
+        }
+        KeyCode::Down => {
+            if app.person_selected < app.people.len().saturating_sub(1) {
+                app.person_selected += 1;
+                // Adjust scroll if selection moves below visible area
+                let visible_items = 10;
+                if app.person_selected >= app.person_list_scroll + visible_items {
+                    app.person_list_scroll = app.person_selected - visible_items + 1;
+                }
+            }
+        }
+        KeyCode::Enter => {
+            app.show_person_details()?;
+        }
+        KeyCode::Char('n') => {
+            app.start_new_person();
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_person_details_input(app: &mut App, key: KeyCode) -> Result<()> {
+    match key {
+        KeyCode::Esc => {
+            app.go_back();
+        }
+        KeyCode::Up => {
+            if app.person_details_log_selected > 0 {
+                app.person_details_log_selected -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if app.person_details_log_selected < app.person_details_logs.len().saturating_sub(1) {
+                app.person_details_log_selected += 1;
+            }
+        }
+        KeyCode::Enter => {
+            app.view_person_details_log();
+        }
+        KeyCode::Char('e') => {
+            app.start_edit_person_from_details();
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_person_edit_input(app: &mut App, key: KeyCode, modifiers: KeyModifiers) -> Result<()> {
+    // Check for Ctrl combinations
+    if modifiers.contains(KeyModifiers::CONTROL) {
+        match key {
+            KeyCode::Char('s') => {
+                app.save_edited_person()?;
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
+    match key {
+        KeyCode::Esc => {
+            app.go_back();
+        }
+        KeyCode::Tab => {
+            // Cycle to next field (0-4)
+            app.person_edit_field = (app.person_edit_field + 1) % 5;
+        }
+        KeyCode::Char('1') => {
+            app.person_edit_field = 0;
+        }
+        KeyCode::Char('2') => {
+            app.person_edit_field = 1;
+        }
+        KeyCode::Char('3') => {
+            app.person_edit_field = 2;
+        }
+        KeyCode::Char('4') => {
+            app.person_edit_field = 3;
+        }
+        KeyCode::Char('5') => {
+            app.person_edit_field = 4;
+        }
+        KeyCode::Char(c) => {
+            // Insert character into current field
+            match app.person_edit_field {
+                0 => app.person_edit_name.push(c),
+                1 => app.person_edit_full_name.push(c),
+                2 => app.person_edit_email.push(c),
+                3 => app.person_edit_tel.push(c),
+                4 => app.person_edit_company.push(c),
+                _ => {}
+            }
+        }
+        KeyCode::Backspace => {
+            // Delete character from current field
+            match app.person_edit_field {
+                0 => { app.person_edit_name.pop(); }
+                1 => { app.person_edit_full_name.pop(); }
+                2 => { app.person_edit_email.pop(); }
+                3 => { app.person_edit_tel.pop(); }
+                4 => { app.person_edit_company.pop(); }
                 _ => {}
             }
         }

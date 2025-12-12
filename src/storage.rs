@@ -114,6 +114,16 @@ impl Storage {
         Ok(people)
     }
 
+    /// Save people to the people.yml file
+    pub fn save_people(&self, people: &[Person]) -> Result<()> {
+        let path = self.people_file();
+        let yaml = serde_yaml::to_string(people)
+            .context("Failed to serialize people")?;
+        fs::write(&path, yaml)
+            .context("Failed to write people.yml")?;
+        Ok(())
+    }
+
     /// Load configuration from config.yml file
     pub fn load_config(&self) -> Result<Config> {
         let path = self.config_file();

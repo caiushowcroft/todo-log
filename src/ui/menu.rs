@@ -32,6 +32,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         "List current todos",
         "Show logs by project/person",
         "View projects",
+        "View people",
     ];
 
     let mut menu_items = Vec::new();

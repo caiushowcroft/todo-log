@@ -14,6 +14,9 @@ pub enum Screen {
     ProjectList,
     ProjectDetails(usize), // Index in projects list
     ProjectEdit(Option<usize>), // None = new project, Some(idx) = edit existing
+    PeopleList,
+    PersonDetails(usize), // Index in people list
+    PersonEdit(Option<usize>), // None = new person, Some(idx) = edit existing
 }
 
 /// Main application state
@@ -95,6 +98,22 @@ pub struct App {
     pub project_edit_status_dropdown_selected: usize,
     pub project_edit_group_dropdown_open: bool,
     pub project_edit_group_dropdown_selected: usize,
+
+    // People list state
+    pub person_selected: usize,
+    pub person_list_scroll: usize,
+
+    // Person details state
+    pub person_details_log_selected: usize,
+    pub person_details_logs: Vec<LogEntry>,
+
+    // Person edit state
+    pub person_edit_field: usize, // 0=name, 1=full_name, 2=email, 3=tel, 4=company
+    pub person_edit_name: String,
+    pub person_edit_full_name: String,
+    pub person_edit_email: String,
+    pub person_edit_tel: String,
+    pub person_edit_company: String,
 
     // Status message
     pub status_message: Option<String>,
@@ -217,6 +236,19 @@ impl App {
             project_edit_status_dropdown_selected: 0,
             project_edit_group_dropdown_open: false,
             project_edit_group_dropdown_selected: 0,
+
+            person_selected: 0,
+            person_list_scroll: 0,
+
+            person_details_log_selected: 0,
+            person_details_logs: Vec::new(),
+
+            person_edit_field: 0,
+            person_edit_name: String::new(),
+            person_edit_full_name: String::new(),
+            person_edit_email: String::new(),
+            person_edit_tel: String::new(),
+            person_edit_company: String::new(),
 
             status_message: None,
         })
@@ -615,6 +647,143 @@ impl App {
             self.go_back();
         }
         Ok(())
+    }
+
+    /// Show people and go to people list screen
+    pub fn show_people(&mut self) -> Result<()> {
+        self.person_selected = 0;
+        self.person_list_scroll = 0;
+        self.go_to_screen(Screen::PeopleList);
+        Ok(())
+    }
+
+    /// Show person details for the selected person
+    pub fn show_person_details(&mut self) -> Result<()> {
+        if let Some(person) = self.people.get(self.person_selected).cloned() {
+            // Load all logs
+            self.logs = self.storage.load_all_logs()?;
+
+            // Filter logs that contain this person
+            self.person_details_logs = self.logs
+                .iter()
+                .filter(|log| log.people.contains(&person.name))
+                .cloned()
+                .collect();
+
+            self.person_details_log_selected = 0;
+            self.go_to_screen(Screen::PersonDetails(self.person_selected));
+        }
+        Ok(())
+    }
+
+    /// Start editing a person from the details screen
+    pub fn start_edit_person_from_details(&mut self) {
+        if let Screen::PersonDetails(idx) = self.screen {
+            if let Some(person) = self.people.get(idx) {
+                self.person_edit_name = person.name.clone();
+                self.person_edit_full_name = person.full_name.clone().unwrap_or_default();
+                self.person_edit_email = person.email.clone().unwrap_or_default();
+                self.person_edit_tel = person.tel.clone().unwrap_or_default();
+                self.person_edit_company = person.company.clone().unwrap_or_default();
+                self.person_edit_field = 0;
+
+                self.go_to_screen(Screen::PersonEdit(Some(idx)));
+            }
+        }
+    }
+
+    /// Start creating a new person
+    pub fn start_new_person(&mut self) {
+        self.person_edit_name = String::new();
+        self.person_edit_full_name = String::new();
+        self.person_edit_email = String::new();
+        self.person_edit_tel = String::new();
+        self.person_edit_company = String::new();
+        self.person_edit_field = 0;
+
+        self.go_to_screen(Screen::PersonEdit(None));
+    }
+
+    /// Save the edited person
+    pub fn save_edited_person(&mut self) -> Result<()> {
+        if let Screen::PersonEdit(idx_opt) = self.screen {
+            match idx_opt {
+                Some(idx) => {
+                    // Editing existing person
+                    if let Some(person) = self.people.get_mut(idx) {
+                        person.name = self.person_edit_name.clone();
+                        person.full_name = if self.person_edit_full_name.is_empty() {
+                            None
+                        } else {
+                            Some(self.person_edit_full_name.clone())
+                        };
+                        person.email = if self.person_edit_email.is_empty() {
+                            None
+                        } else {
+                            Some(self.person_edit_email.clone())
+                        };
+                        person.tel = if self.person_edit_tel.is_empty() {
+                            None
+                        } else {
+                            Some(self.person_edit_tel.clone())
+                        };
+                        person.company = if self.person_edit_company.is_empty() {
+                            None
+                        } else {
+                            Some(self.person_edit_company.clone())
+                        };
+
+                        self.storage.save_people(&self.people)?;
+                        self.status_message = Some("Person saved".to_string());
+                    }
+                }
+                None => {
+                    // Creating new person
+                    let new_person = Person {
+                        name: self.person_edit_name.clone(),
+                        full_name: if self.person_edit_full_name.is_empty() {
+                            None
+                        } else {
+                            Some(self.person_edit_full_name.clone())
+                        },
+                        email: if self.person_edit_email.is_empty() {
+                            None
+                        } else {
+                            Some(self.person_edit_email.clone())
+                        },
+                        tel: if self.person_edit_tel.is_empty() {
+                            None
+                        } else {
+                            Some(self.person_edit_tel.clone())
+                        },
+                        company: if self.person_edit_company.is_empty() {
+                            None
+                        } else {
+                            Some(self.person_edit_company.clone())
+                        },
+                    };
+
+                    self.people.push(new_person);
+                    self.storage.save_people(&self.people)?;
+                    self.status_message = Some("Person created".to_string());
+                }
+            }
+
+            // Reload people from file to ensure consistency
+            self.people = self.storage.load_people()?;
+
+            self.go_back();
+        }
+        Ok(())
+    }
+
+    /// View log from person details screen
+    pub fn view_person_details_log(&mut self) {
+        if let Some(log) = self.person_details_logs.get(self.person_details_log_selected) {
+            let path = log.file_path.clone();
+            self.view_log_scroll = 0;
+            self.go_to_screen(Screen::ViewLog(path));
+        }
     }
 
     /// Update autocomplete suggestions based on current input
