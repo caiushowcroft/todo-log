@@ -1,6 +1,7 @@
 use crate::models::{Config, LogEntry, LogFilter, Person, Project, Todo, TodoFilter};
 use crate::storage::Storage;
 use anyhow::Result;
+use chrono::TimeZone;
 use std::path::PathBuf;
 
 /// The current screen/view of the application
@@ -42,6 +43,9 @@ pub struct App {
     pub autocomplete_index: usize,
     pub autocomplete_active: bool,
     pub autocomplete_type: AutocompleteType,
+    pub timestamp_editing: bool,
+    pub timestamp_edit_input: String,
+    pub timestamp_edit_cursor: usize,
 
     // File browser state
     pub file_browser_open: bool,
@@ -189,6 +193,9 @@ impl App {
             autocomplete_index: 0,
             autocomplete_active: false,
             autocomplete_type: AutocompleteType::None,
+            timestamp_editing: false,
+            timestamp_edit_input: String::new(),
+            timestamp_edit_cursor: 0,
 
             file_browser_open: false,
             file_browser_dir: dirs::home_dir().unwrap_or_else(|| PathBuf::from("/")),
@@ -303,6 +310,34 @@ impl App {
         self.status_message = Some(format!("Log saved to {:?}", path));
         self.go_to_screen(Screen::Menu);
         Ok(())
+    }
+
+    /// Start editing the timestamp
+    pub fn start_timestamp_edit(&mut self) {
+        self.timestamp_editing = true;
+        self.timestamp_edit_input = self.current_log.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+        self.timestamp_edit_cursor = self.timestamp_edit_input.chars().count();
+    }
+
+    /// Apply the edited timestamp
+    pub fn apply_timestamp_edit(&mut self) {
+        use chrono::NaiveDateTime;
+
+        // Try to parse the timestamp
+        if let Ok(naive_dt) = NaiveDateTime::parse_from_str(&self.timestamp_edit_input, "%Y-%m-%d %H:%M:%S") {
+            self.current_log.timestamp = chrono::Local.from_local_datetime(&naive_dt).unwrap();
+            self.timestamp_editing = false;
+            self.status_message = Some("Timestamp updated".to_string());
+        } else {
+            self.status_message = Some("Invalid timestamp format. Use: YYYY-MM-DD HH:MM:SS".to_string());
+        }
+    }
+
+    /// Cancel timestamp editing
+    pub fn cancel_timestamp_edit(&mut self) {
+        self.timestamp_editing = false;
+        self.timestamp_edit_input.clear();
+        self.timestamp_edit_cursor = 0;
     }
 
     /// Load todos and go to todo list screen

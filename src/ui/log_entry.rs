@@ -21,9 +21,19 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         .split(area);
 
     // Header with timestamp
-    let timestamp = app.current_log.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
-    let header = Paragraph::new(format!("New Log Entry - {}", timestamp))
-        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+    let header_content = if app.timestamp_editing {
+        format!("Edit Timestamp: {}", app.timestamp_edit_input)
+    } else {
+        let timestamp = app.current_log.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+        format!("New Log Entry - {}", timestamp)
+    };
+    let header_style = if app.timestamp_editing {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+    };
+    let header = Paragraph::new(header_content)
+        .style(header_style)
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(header, chunks[0]);
 
@@ -45,12 +55,25 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled("ESC", Style::default().fg(Color::Yellow)),
             Span::raw(" Cancel"),
         ]
+    } else if app.timestamp_editing {
+        vec![
+            Span::styled("←→", Style::default().fg(Color::Yellow)),
+            Span::raw(" Move  "),
+            Span::styled("Enter", Style::default().fg(Color::Yellow)),
+            Span::raw(" Apply  "),
+            Span::styled("ESC", Style::default().fg(Color::Yellow)),
+            Span::raw(" Cancel  "),
+            Span::styled("Format:", Style::default().fg(Color::Cyan)),
+            Span::raw(" YYYY-MM-DD HH:MM:SS"),
+        ]
     } else {
         vec![
             Span::styled("Ctrl+S", Style::default().fg(Color::Yellow)),
             Span::raw(" Save  "),
             Span::styled("Ctrl+A", Style::default().fg(Color::Yellow)),
             Span::raw(" Attach  "),
+            Span::styled("Ctrl+T", Style::default().fg(Color::Yellow)),
+            Span::raw(" Edit time  "),
             Span::styled("ESC", Style::default().fg(Color::Yellow)),
             Span::raw(" Cancel  "),
             Span::styled("#", Style::default().fg(Color::Green)),
@@ -73,6 +96,16 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     // Render file browser popup if open
     if app.file_browser_open {
         render_file_browser(frame, app, area);
+    }
+
+    // Set cursor position for timestamp editing
+    if app.timestamp_editing {
+        let inner = chunks[0].inner(ratatui::layout::Margin { vertical: 1, horizontal: 1 });
+        let prompt_len = "Edit Timestamp: ".len() as u16;
+        frame.set_cursor_position((
+            inner.x + prompt_len + app.timestamp_edit_cursor as u16,
+            inner.y,
+        ));
     }
 }
 

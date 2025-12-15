@@ -172,6 +172,76 @@ fn handle_log_entry_input(app: &mut App, key: KeyCode, modifiers: KeyModifiers) 
         return Ok(());
     }
 
+    // Handle timestamp editing
+    if app.timestamp_editing {
+        match key {
+            KeyCode::Enter => {
+                app.apply_timestamp_edit();
+                return Ok(());
+            }
+            KeyCode::Esc => {
+                app.cancel_timestamp_edit();
+                return Ok(());
+            }
+            KeyCode::Char(c) => {
+                // Insert character at cursor position
+                let mut chars: Vec<char> = app.timestamp_edit_input.chars().collect();
+                chars.insert(app.timestamp_edit_cursor, c);
+                app.timestamp_edit_input = chars.into_iter().collect();
+                app.timestamp_edit_cursor += 1;
+                return Ok(());
+            }
+            KeyCode::Backspace => {
+                // Delete character before cursor
+                if app.timestamp_edit_cursor > 0 {
+                    let mut chars: Vec<char> = app.timestamp_edit_input.chars().collect();
+                    chars.remove(app.timestamp_edit_cursor - 1);
+                    app.timestamp_edit_input = chars.into_iter().collect();
+                    app.timestamp_edit_cursor -= 1;
+                }
+                return Ok(());
+            }
+            KeyCode::Delete => {
+                // Delete character at cursor
+                let char_count = app.timestamp_edit_input.chars().count();
+                if app.timestamp_edit_cursor < char_count {
+                    let mut chars: Vec<char> = app.timestamp_edit_input.chars().collect();
+                    chars.remove(app.timestamp_edit_cursor);
+                    app.timestamp_edit_input = chars.into_iter().collect();
+                }
+                return Ok(());
+            }
+            KeyCode::Left => {
+                // Move cursor left
+                if app.timestamp_edit_cursor > 0 {
+                    app.timestamp_edit_cursor -= 1;
+                }
+                return Ok(());
+            }
+            KeyCode::Right => {
+                // Move cursor right
+                let char_count = app.timestamp_edit_input.chars().count();
+                if app.timestamp_edit_cursor < char_count {
+                    app.timestamp_edit_cursor += 1;
+                }
+                return Ok(());
+            }
+            KeyCode::Home => {
+                // Move cursor to start
+                app.timestamp_edit_cursor = 0;
+                return Ok(());
+            }
+            KeyCode::End => {
+                // Move cursor to end
+                app.timestamp_edit_cursor = app.timestamp_edit_input.chars().count();
+                return Ok(());
+            }
+            _ => {
+                return Ok(());
+            }
+        }
+    }
+
     // Handle autocomplete navigation
     if app.autocomplete_active {
         match key {
@@ -209,6 +279,11 @@ fn handle_log_entry_input(app: &mut App, key: KeyCode, modifiers: KeyModifiers) 
             KeyCode::Char('a') => {
                 // Open file browser
                 app.open_file_browser();
+                return Ok(());
+            }
+            KeyCode::Char('t') => {
+                // Start timestamp editing
+                app.start_timestamp_edit();
                 return Ok(());
             }
             _ => {}
