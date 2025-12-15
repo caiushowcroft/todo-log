@@ -15,6 +15,7 @@ impl Storage {
         Ok(Self { base_dir })
     }
 
+    #[allow(dead_code)] // Utility constructor for tests or custom paths
     pub fn with_base_dir(base_dir: PathBuf) -> Self {
         Self { base_dir }
     }
@@ -219,6 +220,7 @@ impl Storage {
     }
 
     /// Get a specific log entry by its file path
+    #[allow(dead_code)] // Utility method for loading individual log entries
     pub fn load_log_by_path(&self, path: &PathBuf) -> Result<Option<LogEntry>> {
         if path.exists() {
             let content = fs::read_to_string(path)?;

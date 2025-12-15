@@ -91,7 +91,6 @@ pub struct App {
     pub project_details_logs: Vec<LogEntry>,
 
     // Project edit state
-    pub editing_project: Option<Project>,
     pub project_edit_field: usize, // 0=name, 1=description, 2=jira, 3=status, 4=group
     pub project_edit_name: String,
     pub project_edit_description: String,
@@ -232,7 +231,6 @@ impl App {
             project_details_log_selected: 0,
             project_details_logs: Vec::new(),
 
-            editing_project: None,
             project_edit_field: 0,
             project_edit_name: String::new(),
             project_edit_description: String::new(),
@@ -557,45 +555,6 @@ impl App {
                 self.project_edit_status_dropdown_open = false;
                 self.project_edit_group_dropdown_open = false;
 
-                self.go_to_screen(Screen::ProjectEdit(Some(idx)));
-            }
-        }
-    }
-
-    /// Start editing the selected project
-    pub fn start_edit_project(&mut self) {
-        if let Some(project) = self.filtered_projects.get(self.project_selected).cloned() {
-            self.project_edit_name = project.name.clone();
-            self.project_edit_description = project.description.clone().unwrap_or_default();
-            self.project_edit_jira = project.jira.clone().unwrap_or_default();
-            self.project_edit_status = project.status.clone();
-            self.project_edit_group = project.group.clone();
-            self.project_edit_field = 0;
-
-            // Initialize dropdown selected indices
-            let states = self.config.allowed_state_names();
-            self.project_edit_status_dropdown_selected = states
-                .iter()
-                .position(|s| s == &project.status)
-                .unwrap_or(0);
-
-            let mut groups = self.config.allowed_groups();
-            groups.insert(0, "(no group)".to_string());
-            let group_to_find = if project.group.is_empty() {
-                "(no group)"
-            } else {
-                &project.group
-            };
-            self.project_edit_group_dropdown_selected = groups
-                .iter()
-                .position(|g| g == group_to_find)
-                .unwrap_or(0);
-
-            self.project_edit_status_dropdown_open = false;
-            self.project_edit_group_dropdown_open = false;
-
-            // Find the index in the original projects list
-            if let Some(idx) = self.projects.iter().position(|p| p.name == project.name) {
                 self.go_to_screen(Screen::ProjectEdit(Some(idx)));
             }
         }
@@ -1024,6 +983,7 @@ impl App {
     }
 
     /// Add an attachment
+    #[allow(dead_code)] // Planned feature for file attachments
     pub fn add_attachment(&mut self, path: PathBuf) {
         if path.exists() {
             self.attachments.push(path);
@@ -1223,6 +1183,7 @@ impl App {
     }
 
     /// Remove an attachment by index
+    #[allow(dead_code)] // Planned feature for file attachments
     pub fn remove_attachment(&mut self, index: usize) {
         if index < self.attachments.len() {
             let removed = self.attachments.remove(index);

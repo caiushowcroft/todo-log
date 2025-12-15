@@ -68,6 +68,7 @@ pub struct LogEntry {
     pub projects: Vec<String>,
     pub people: Vec<String>,
     pub todos: Vec<Todo>,
+    #[allow(dead_code)] // Planned feature for file attachments
     pub attachments: Vec<PathBuf>,
     pub file_path: PathBuf,
 }
