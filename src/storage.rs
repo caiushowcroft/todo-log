@@ -220,7 +220,6 @@ impl Storage {
     }
 
     /// Get a specific log entry by its file path
-    #[allow(dead_code)] // Utility method for loading individual log entries
     pub fn load_log_by_path(&self, path: &PathBuf) -> Result<Option<LogEntry>> {
         if path.exists() {
             let content = fs::read_to_string(path)?;
@@ -228,6 +227,13 @@ impl Storage {
         } else {
             Ok(None)
         }
+    }
+
+    /// Update an existing log entry's content
+    pub fn update_log_entry(&self, path: &PathBuf, content: &str) -> Result<()> {
+        fs::write(path, content)
+            .context("Failed to update log file")?;
+        Ok(())
     }
 }
 

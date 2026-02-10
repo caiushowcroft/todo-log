@@ -25,7 +25,11 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         format!("Edit Timestamp: {}", app.timestamp_edit_input)
     } else {
         let timestamp = app.current_log.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
-        format!("New Log Entry - {}", timestamp)
+        if app.log_editing_path.is_some() {
+            format!("Edit Log Entry - {}", timestamp)
+        } else {
+            format!("New Log Entry - {}", timestamp)
+        }
     };
     let header_style = if app.timestamp_editing {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)

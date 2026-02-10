@@ -367,6 +367,9 @@ fn handle_todo_list_input(app: &mut App, key: KeyCode) -> Result<()> {
         KeyCode::Char('l') => {
             app.view_todo_log();
         }
+        KeyCode::Char('w') => {
+            app.edit_todo_log()?;
+        }
         KeyCode::Char('c') => {
             // Open completed filter
             app.todo_filter_panel = TodoFilterPanel::Completed;

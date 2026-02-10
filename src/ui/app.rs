@@ -39,6 +39,7 @@ pub struct App {
     pub current_log: LogEntry,
     pub log_cursor_pos: usize,
     pub attachments: Vec<PathBuf>,
+    pub log_editing_path: Option<PathBuf>, // Some(path) when editing existing log, None when creating new
     pub autocomplete_suggestions: Vec<String>,
     pub autocomplete_index: usize,
     pub autocomplete_active: bool,
@@ -188,6 +189,7 @@ impl App {
             current_log: LogEntry::new(),
             log_cursor_pos: 0,
             attachments: Vec::new(),
+            log_editing_path: None,
             autocomplete_suggestions: Vec::new(),
             autocomplete_index: 0,
             autocomplete_active: false,
@@ -292,9 +294,27 @@ impl App {
         self.current_log = LogEntry::new();
         self.log_cursor_pos = 0;
         self.attachments.clear();
+        self.log_editing_path = None;
         self.autocomplete_suggestions.clear();
         self.autocomplete_active = false;
         self.go_to_screen(Screen::LogEntry);
+    }
+
+    /// Start editing the log for the currently selected todo
+    pub fn edit_todo_log(&mut self) -> Result<()> {
+        if let Some(todo) = self.filtered_todos.get(self.todo_selected) {
+            let path = todo.log_path.clone();
+            if let Some(log) = self.storage.load_log_by_path(&path)? {
+                self.current_log = log;
+                self.log_cursor_pos = self.current_log.content.chars().count();
+                self.attachments.clear();
+                self.log_editing_path = Some(path);
+                self.autocomplete_suggestions.clear();
+                self.autocomplete_active = false;
+                self.go_to_screen(Screen::LogEntry);
+            }
+        }
+        Ok(())
     }
 
     /// Save the current log entry
@@ -304,9 +324,18 @@ impl App {
             return Ok(());
         }
 
-        let path = self.storage.save_log_entry(&self.current_log, &self.attachments)?;
-        self.status_message = Some(format!("Log saved to {:?}", path));
-        self.go_to_screen(Screen::Menu);
+        if let Some(ref editing_path) = self.log_editing_path {
+            // Update existing log file
+            self.storage.update_log_entry(editing_path, &self.current_log.content)?;
+            self.status_message = Some("Log updated".to_string());
+            self.log_editing_path = None;
+            self.go_back();
+        } else {
+            // Create new log entry
+            let path = self.storage.save_log_entry(&self.current_log, &self.attachments)?;
+            self.status_message = Some(format!("Log saved to {:?}", path));
+            self.go_to_screen(Screen::Menu);
+        }
         Ok(())
     }
 
