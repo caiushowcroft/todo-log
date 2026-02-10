@@ -34,6 +34,7 @@ pub struct App {
     pub people: Vec<Person>,
     pub todos: Vec<Todo>,
     pub logs: Vec<LogEntry>,
+    pub pins: Vec<PathBuf>,
 
     // Log entry editing state
     pub current_log: LogEntry,
@@ -172,6 +173,7 @@ impl App {
         let config = storage.load_config().unwrap_or_default();
         let projects = storage.load_projects().unwrap_or_default();
         let people = storage.load_people().unwrap_or_default();
+        let pins = storage.load_pins().unwrap_or_default();
 
         Ok(Self {
             storage,
@@ -185,6 +187,7 @@ impl App {
             people,
             todos: Vec::new(),
             logs: Vec::new(),
+            pins,
 
             current_log: LogEntry::new(),
             log_cursor_pos: 0,
@@ -418,6 +421,18 @@ impl App {
             .filter(|l| self.log_filter.matches(l))
             .cloned()
             .collect();
+
+        // Sort so pinned logs come first, maintaining timestamp order within each group
+        let pins = &self.pins;
+        self.filtered_logs.sort_by(|a, b| {
+            let a_pinned = pins.contains(&a.file_path);
+            let b_pinned = pins.contains(&b.file_path);
+            match (a_pinned, b_pinned) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => b.timestamp.cmp(&a.timestamp), // Newest first within each group
+            }
+        });
     }
 
     /// View the selected log entry
@@ -429,6 +444,23 @@ impl App {
         }
     }
 
+    /// Start editing the selected log from the log list
+    pub fn edit_selected_log(&mut self) -> Result<()> {
+        if let Some(log) = self.filtered_logs.get(self.log_selected) {
+            let path = log.file_path.clone();
+            if let Some(loaded_log) = self.storage.load_log_by_path(&path)? {
+                self.current_log = loaded_log;
+                self.log_cursor_pos = self.current_log.content.chars().count();
+                self.attachments.clear();
+                self.log_editing_path = Some(path);
+                self.autocomplete_suggestions.clear();
+                self.autocomplete_active = false;
+                self.go_to_screen(Screen::LogEntry);
+            }
+        }
+        Ok(())
+    }
+
     /// View log for the selected todo
     pub fn view_todo_log(&mut self) {
         if let Some(todo) = self.filtered_todos.get(self.todo_selected) {
@@ -436,6 +468,42 @@ impl App {
             self.view_log_scroll = 0;
             self.go_to_screen(Screen::ViewLog(path));
         }
+    }
+
+    /// Check if a log path is pinned
+    pub fn is_pinned(&self, path: &PathBuf) -> bool {
+        self.pins.contains(path)
+    }
+
+    /// Toggle pin status for the selected log in the log list
+    pub fn toggle_pin_selected_log(&mut self) -> Result<()> {
+        if let Some(log) = self.filtered_logs.get(self.log_selected) {
+            let path = log.file_path.clone();
+            self.toggle_pin(&path)?;
+        }
+        Ok(())
+    }
+
+    /// Toggle pin status for the currently viewed log
+    pub fn toggle_pin_viewed_log(&mut self) -> Result<()> {
+        if let Screen::ViewLog(ref path) = self.screen {
+            let path = path.clone();
+            self.toggle_pin(&path)?;
+        }
+        Ok(())
+    }
+
+    /// Toggle pin status for a log path
+    fn toggle_pin(&mut self, path: &PathBuf) -> Result<()> {
+        if let Some(pos) = self.pins.iter().position(|p| p == path) {
+            self.pins.remove(pos);
+            self.status_message = Some("Log unpinned".to_string());
+        } else {
+            self.pins.push(path.clone());
+            self.status_message = Some("Log pinned".to_string());
+        }
+        self.storage.save_pins(&self.pins)?;
+        Ok(())
     }
 
     /// View log from project details screen

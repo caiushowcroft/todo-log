@@ -71,8 +71,8 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                     Screen::Menu => handle_menu_input(app, key.code),
                     Screen::LogEntry => handle_log_entry_input(app, key.code, key.modifiers)?,
                     Screen::TodoList => handle_todo_list_input(app, key.code)?,
-                    Screen::LogList => handle_log_list_input(app, key.code),
-                    Screen::ViewLog(_) => handle_view_log_input(app, key.code),
+                    Screen::LogList => handle_log_list_input(app, key.code)?,
+                    Screen::ViewLog(_) => handle_view_log_input(app, key.code)?,
                     Screen::ProjectList => handle_project_list_input(app, key.code)?,
                     Screen::ProjectDetails(_) => handle_project_details_input(app, key.code)?,
                     Screen::ProjectEdit(_) => handle_project_edit_input(app, key.code, key.modifiers)?,
@@ -462,24 +462,24 @@ fn handle_todo_people_filter_input(app: &mut App, key: KeyCode) {
     }
 }
 
-fn handle_log_list_input(app: &mut App, key: KeyCode) {
+fn handle_log_list_input(app: &mut App, key: KeyCode) -> Result<()> {
     // Handle filter panel input if one is open
     match app.log_filter_panel {
         LogFilterPanel::StartDate => {
             handle_date_filter_input(app, key, true);
-            return;
+            return Ok(());
         }
         LogFilterPanel::EndDate => {
             handle_date_filter_input(app, key, false);
-            return;
+            return Ok(());
         }
         LogFilterPanel::Projects => {
             handle_project_filter_input(app, key);
-            return;
+            return Ok(());
         }
         LogFilterPanel::People => {
             handle_people_filter_input(app, key);
-            return;
+            return Ok(());
         }
         LogFilterPanel::None => {}
     }
@@ -502,6 +502,9 @@ fn handle_log_list_input(app: &mut App, key: KeyCode) {
         KeyCode::Char('l') | KeyCode::Enter => {
             app.view_selected_log();
         }
+        KeyCode::Char('w') => {
+            app.edit_selected_log()?;
+        }
         KeyCode::Char('s') => {
             // Open start date filter
             app.init_date_inputs();
@@ -513,6 +516,9 @@ fn handle_log_list_input(app: &mut App, key: KeyCode) {
             app.log_filter_panel = LogFilterPanel::EndDate;
         }
         KeyCode::Char('p') => {
+            app.toggle_pin_selected_log()?;
+        }
+        KeyCode::Char('j') => {
             // Open projects filter
             app.log_filter_project_selected = 0;
             app.log_filter_panel = LogFilterPanel::Projects;
@@ -524,6 +530,8 @@ fn handle_log_list_input(app: &mut App, key: KeyCode) {
         }
         _ => {}
     }
+
+    Ok(())
 }
 
 fn handle_date_filter_input(app: &mut App, key: KeyCode, is_start: bool) {
@@ -634,7 +642,7 @@ fn handle_people_filter_input(app: &mut App, key: KeyCode) {
     }
 }
 
-fn handle_view_log_input(app: &mut App, key: KeyCode) {
+fn handle_view_log_input(app: &mut App, key: KeyCode) -> Result<()> {
     match key {
         KeyCode::Esc => {
             app.go_back();
@@ -653,8 +661,12 @@ fn handle_view_log_input(app: &mut App, key: KeyCode) {
         KeyCode::PageDown => {
             app.view_log_scroll += 10;
         }
+        KeyCode::Char('p') => {
+            app.toggle_pin_viewed_log()?;
+        }
         _ => {}
     }
+    Ok(())
 }
 
 fn handle_project_list_input(app: &mut App, key: KeyCode) -> Result<()> {

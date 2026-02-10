@@ -39,11 +39,15 @@ pub fn render(frame: &mut Frame, app: &mut App, area: Rect) {
             Span::raw(" Navigate  "),
             Span::styled("l", Style::default().fg(Color::Yellow)),
             Span::raw(" View  "),
-            Span::styled("s", Style::default().fg(Color::Yellow)),
-            Span::raw(" Start date  "),
-            Span::styled("e", Style::default().fg(Color::Yellow)),
-            Span::raw(" End date  "),
+            Span::styled("w", Style::default().fg(Color::Yellow)),
+            Span::raw(" Edit  "),
             Span::styled("p", Style::default().fg(Color::Yellow)),
+            Span::raw(" Pin  "),
+            Span::styled("s", Style::default().fg(Color::Yellow)),
+            Span::raw(" Start  "),
+            Span::styled("e", Style::default().fg(Color::Yellow)),
+            Span::raw(" End  "),
+            Span::styled("j", Style::default().fg(Color::Yellow)),
             Span::raw(" Projects  "),
             Span::styled("h", Style::default().fg(Color::Yellow)),
             Span::raw(" People  "),
@@ -104,9 +108,9 @@ fn render_filters_summary(frame: &mut Frame, app: &App, area: Rect) {
 
     // Projects filter summary
     let projects_text = if app.log_filter.projects.is_empty() {
-        "[p] All".to_string()
+        "[j] All".to_string()
     } else {
-        format!("[p] {}", app.log_filter.projects.join(", "))
+        format!("[j] {}", app.log_filter.projects.join(", "))
     };
     let projects_style = if app.log_filter_panel == LogFilterPanel::Projects {
         Style::default().fg(Color::Yellow)
@@ -291,49 +295,80 @@ fn render_people_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_log_list(frame: &mut Frame, app: &mut App, area: Rect) {
-    let items: Vec<ListItem> = app
-        .filtered_logs
-        .iter()
-        .enumerate()
-        .map(|(i, log)| {
-            let timestamp = log.timestamp.format("%Y-%m-%d %H:%M").to_string();
-            let first_line = log.first_line();
-            let preview: String = first_line.chars().take(50).collect();
+    // Count pinned logs to know where to add section headers
+    let pinned_count = app.filtered_logs.iter()
+        .filter(|log| app.is_pinned(&log.file_path))
+        .count();
 
-            let tags = format!(
-                " #{}",
-                if log.projects.is_empty() {
-                    "-".to_string()
-                } else {
-                    log.projects.join(" #")
-                }
-            );
+    let mut items: Vec<ListItem> = Vec::new();
+    let mut visual_index = 0;
+    let mut selected_visual_index = 0;
 
-            let style = if i == app.log_selected {
-                Style::default().bg(Color::DarkGray).fg(Color::White)
-            } else {
-                Style::default()
-            };
+    // Add pinned section header if there are pinned logs
+    if pinned_count > 0 {
+        items.push(ListItem::new(Line::from(vec![
+            Span::styled("📌 Pinned", Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
+        ])));
+        visual_index += 1;
+    }
 
-            let line = Line::from(vec![
-                Span::styled(timestamp, Style::default().fg(Color::Cyan)),
-                Span::raw(" | "),
-                Span::styled(preview, style),
-                Span::styled(tags, Style::default().fg(Color::Green)),
-            ]);
+    for (i, log) in app.filtered_logs.iter().enumerate() {
+        let is_pinned = app.is_pinned(&log.file_path);
 
-            ListItem::new(line)
-        })
-        .collect();
+        // Add separator before first unpinned log
+        if i == pinned_count && pinned_count > 0 {
+            items.push(ListItem::new(Line::from(vec![
+                Span::styled("─── Logs ───", Style::default().fg(Color::DarkGray)),
+            ])));
+            visual_index += 1;
+        }
+
+        if i == app.log_selected {
+            selected_visual_index = visual_index;
+        }
+
+        items.push(render_log_item(i, log, app.log_selected, is_pinned));
+        visual_index += 1;
+    }
 
     let mut state = ListState::default();
-    state.select(Some(app.log_selected));
+    state.select(Some(selected_visual_index));
 
     let list = List::new(items)
         .block(Block::default().borders(Borders::ALL).title("Log Entries"))
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
     frame.render_stateful_widget(list, area, &mut state);
+}
+
+fn render_log_item(index: usize, log: &crate::models::LogEntry, selected: usize, is_pinned: bool) -> ListItem<'static> {
+    let timestamp = log.timestamp.format("%Y-%m-%d %H:%M").to_string();
+    let first_line = log.first_line();
+    let preview: String = first_line.chars().take(50).collect();
+
+    let tags = format!(
+        " #{}",
+        if log.projects.is_empty() {
+            "-".to_string()
+        } else {
+            log.projects.join(" #")
+        }
+    );
+
+    let is_selected = index == selected;
+    let bg_color = if is_selected { Color::DarkGray } else { Color::Reset };
+
+    let pin_indicator = if is_pinned { "📌 " } else { "   " };
+
+    let line = Line::from(vec![
+        Span::styled(pin_indicator.to_string(), Style::default().bg(bg_color)),
+        Span::styled(timestamp, Style::default().fg(Color::Cyan).bg(bg_color)),
+        Span::styled(" | ".to_string(), Style::default().bg(bg_color)),
+        Span::styled(preview, Style::default().fg(if is_selected { Color::White } else { Color::Reset }).bg(bg_color)),
+        Span::styled(tags, Style::default().fg(Color::Green).bg(bg_color)),
+    ]);
+
+    ListItem::new(line)
 }
 
 pub fn render_view_log(frame: &mut Frame, app: &App, area: Rect, path: &std::path::PathBuf) {
@@ -401,9 +436,13 @@ pub fn render_view_log(frame: &mut Frame, app: &App, area: Rect, path: &std::pat
     frame.render_widget(log_content, chunks[1]);
 
     // Help bar
+    let is_pinned = app.is_pinned(path);
+    let pin_text = if is_pinned { " Unpin  " } else { " Pin  " };
     let help_text = vec![
         Span::styled("↑↓", Style::default().fg(Color::Yellow)),
         Span::raw(" Scroll  "),
+        Span::styled("p", Style::default().fg(Color::Yellow)),
+        Span::raw(pin_text),
         Span::styled("ESC", Style::default().fg(Color::Yellow)),
         Span::raw(" Back"),
     ];

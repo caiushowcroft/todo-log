@@ -37,6 +37,10 @@ impl Storage {
         self.base_dir.join("config.yml")
     }
 
+    pub fn pins_file(&self) -> PathBuf {
+        self.base_dir.join("pins.yaml")
+    }
+
     /// Initialize the storage directory with example files if it doesn't exist
     pub fn initialize(&self) -> Result<()> {
         if !self.base_dir.exists() {
@@ -233,6 +237,39 @@ impl Storage {
     pub fn update_log_entry(&self, path: &PathBuf, content: &str) -> Result<()> {
         fs::write(path, content)
             .context("Failed to update log file")?;
+        Ok(())
+    }
+
+    /// Load pinned log paths from pins.yaml
+    pub fn load_pins(&self) -> Result<Vec<PathBuf>> {
+        let path = self.pins_file();
+        if !path.exists() {
+            return Ok(Vec::new());
+        }
+
+        let content = fs::read_to_string(&path)
+            .context("Failed to read pins.yaml")?;
+
+        if content.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let pins: Vec<String> = serde_yaml::from_str(&content)
+            .context("Failed to parse pins.yaml")?;
+
+        Ok(pins.into_iter().map(PathBuf::from).collect())
+    }
+
+    /// Save pinned log paths to pins.yaml
+    pub fn save_pins(&self, pins: &[PathBuf]) -> Result<()> {
+        let path = self.pins_file();
+        let pin_strings: Vec<String> = pins.iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect();
+        let yaml = serde_yaml::to_string(&pin_strings)
+            .context("Failed to serialize pins")?;
+        fs::write(&path, yaml)
+            .context("Failed to write pins.yaml")?;
         Ok(())
     }
 }
