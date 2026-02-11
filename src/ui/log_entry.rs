@@ -8,7 +8,7 @@ use ratatui::{
 
 use super::app::{App, AutocompleteType};
 
-pub fn render(frame: &mut Frame, app: &App, area: Rect) {
+pub fn render(frame: &mut Frame, app: &mut App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
@@ -234,8 +234,27 @@ fn render_file_browser(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, chunks[1], &mut state);
 }
 
-fn render_editor(frame: &mut Frame, app: &App, area: Rect) {
+fn render_editor(frame: &mut Frame, app: &mut App, area: Rect) {
     let content = &app.current_log.content;
+
+    // Calculate cursor line position first to determine scroll
+    let before_cursor: String = content.chars().take(app.log_cursor_pos).collect();
+    let lines_before: Vec<&str> = before_cursor.split('\n').collect();
+    let cursor_y = (lines_before.len() - 1) as u16;
+    let cursor_x = lines_before.last().map(|l| l.chars().count()).unwrap_or(0) as u16;
+
+    // Calculate visible height (inner area minus borders)
+    let inner = area.inner(ratatui::layout::Margin { vertical: 1, horizontal: 1 });
+    let visible_height = inner.height;
+
+    // Adjust scroll to keep cursor visible
+    if cursor_y < app.log_scroll {
+        // Cursor is above visible area, scroll up
+        app.log_scroll = cursor_y;
+    } else if cursor_y >= app.log_scroll + visible_height {
+        // Cursor is below visible area, scroll down
+        app.log_scroll = cursor_y - visible_height + 1;
+    }
 
     // Process content line by line for proper multi-line support
     let lines: Vec<Line> = content
@@ -275,24 +294,19 @@ fn render_editor(frame: &mut Frame, app: &App, area: Rect) {
                 .title("Log Content (type your log entry)")
                 .border_style(Style::default().fg(Color::Cyan)),
         )
-        .wrap(Wrap { trim: false });
+        .wrap(Wrap { trim: false })
+        .scroll((app.log_scroll, 0));
 
     frame.render_widget(editor, area);
 
-    // Only show cursor if file browser is not open
-    if !app.file_browser_open {
-        // Calculate cursor position accounting for newlines
-        let inner = area.inner(ratatui::layout::Margin { vertical: 1, horizontal: 1 });
-
-        // Find which line and column the cursor is on
-        let before_cursor: String = content.chars().take(app.log_cursor_pos).collect();
-        let lines_before: Vec<&str> = before_cursor.split('\n').collect();
-        let cursor_y = (lines_before.len() - 1) as u16;
-        let cursor_x = lines_before.last().map(|l| l.chars().count()).unwrap_or(0) as u16;
+    // Only show cursor if file browser is not open and not editing timestamp
+    if !app.file_browser_open && !app.timestamp_editing {
+        // Cursor position relative to scroll
+        let visual_cursor_y = cursor_y.saturating_sub(app.log_scroll);
 
         frame.set_cursor_position((
             inner.x + cursor_x.min(inner.width.saturating_sub(1)),
-            inner.y + cursor_y.min(inner.height.saturating_sub(1)),
+            inner.y + visual_cursor_y.min(inner.height.saturating_sub(1)),
         ));
     }
 }

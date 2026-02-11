@@ -39,6 +39,7 @@ pub struct App {
     // Log entry editing state
     pub current_log: LogEntry,
     pub log_cursor_pos: usize,
+    pub log_scroll: u16, // Vertical scroll offset for log editor
     pub attachments: Vec<PathBuf>,
     pub log_editing_path: Option<PathBuf>, // Some(path) when editing existing log, None when creating new
     pub autocomplete_suggestions: Vec<String>,
@@ -191,6 +192,7 @@ impl App {
 
             current_log: LogEntry::new(),
             log_cursor_pos: 0,
+            log_scroll: 0,
             attachments: Vec::new(),
             log_editing_path: None,
             autocomplete_suggestions: Vec::new(),
@@ -296,6 +298,7 @@ impl App {
     pub fn start_new_log(&mut self) {
         self.current_log = LogEntry::new();
         self.log_cursor_pos = 0;
+        self.log_scroll = 0;
         self.attachments.clear();
         self.log_editing_path = None;
         self.autocomplete_suggestions.clear();
@@ -310,6 +313,7 @@ impl App {
             if let Some(log) = self.storage.load_log_by_path(&path)? {
                 self.current_log = log;
                 self.log_cursor_pos = self.current_log.content.chars().count();
+                self.log_scroll = 0;
                 self.attachments.clear();
                 self.log_editing_path = Some(path);
                 self.autocomplete_suggestions.clear();
@@ -451,6 +455,7 @@ impl App {
             if let Some(loaded_log) = self.storage.load_log_by_path(&path)? {
                 self.current_log = loaded_log;
                 self.log_cursor_pos = self.current_log.content.chars().count();
+                self.log_scroll = 0;
                 self.attachments.clear();
                 self.log_editing_path = Some(path);
                 self.autocomplete_suggestions.clear();
