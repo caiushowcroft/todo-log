@@ -377,6 +377,7 @@ pub fn render_view_log(frame: &mut Frame, app: &App, area: Rect, path: &std::pat
         .margin(1)
         .constraints([
             Constraint::Length(3),  // Title
+            Constraint::Length(3),  // Tags bar
             Constraint::Min(10),    // Content
             Constraint::Length(3),  // Help bar
         ])
@@ -393,12 +394,47 @@ pub fn render_view_log(frame: &mut Frame, app: &App, area: Rect, path: &std::pat
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(title, chunks[0]);
 
+    // Tags bar - show all tags with highlighting for selected
+    let mut tag_spans: Vec<Span> = vec![Span::raw(" ")];
+    for (i, tag) in app.view_log_tags.iter().enumerate() {
+        let is_selected = app.view_log_tag_selected == Some(i);
+        let prefix = if tag.is_project { "#" } else { "@" };
+        let base_color = if tag.is_project { Color::Green } else { Color::Blue };
+
+        let style = if is_selected {
+            Style::default()
+                .fg(Color::Black)
+                .bg(base_color)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default()
+                .fg(base_color)
+                .add_modifier(Modifier::BOLD)
+        };
+
+        tag_spans.push(Span::styled(format!("{}{}", prefix, tag.name), style));
+        tag_spans.push(Span::raw("  "));
+    }
+
+    if app.view_log_tags.is_empty() {
+        tag_spans.push(Span::styled("(no tags)", Style::default().fg(Color::DarkGray)));
+    }
+
+    let tags_bar = Paragraph::new(Line::from(tag_spans))
+        .block(Block::default().borders(Borders::ALL).title("Tags (Tab to select, Enter to view logs)"));
+    frame.render_widget(tags_bar, chunks[1]);
+
     // Content
     let content = if let Ok(text) = std::fs::read_to_string(path) {
         text
     } else {
         "Error reading log file".to_string()
     };
+
+    // Get the selected tag name for highlighting
+    let selected_tag = app.view_log_tag_selected
+        .and_then(|i| app.view_log_tags.get(i))
+        .map(|t| (t.name.clone(), t.is_project));
 
     // Syntax highlight the content
     let lines: Vec<Line> = content
@@ -410,7 +446,7 @@ pub fn render_view_log(frame: &mut Frame, app: &App, area: Rect, path: &std::pat
             for c in line.chars() {
                 if c.is_whitespace() {
                     if !current_word.is_empty() {
-                        let style = word_style(&current_word);
+                        let style = word_style_with_selection(&current_word, &selected_tag);
                         spans.push(Span::styled(current_word.clone(), style));
                         current_word.clear();
                     }
@@ -421,7 +457,7 @@ pub fn render_view_log(frame: &mut Frame, app: &App, area: Rect, path: &std::pat
             }
 
             if !current_word.is_empty() {
-                let style = word_style(&current_word);
+                let style = word_style_with_selection(&current_word, &selected_tag);
                 spans.push(Span::styled(current_word, style));
             }
 
@@ -433,7 +469,7 @@ pub fn render_view_log(frame: &mut Frame, app: &App, area: Rect, path: &std::pat
         .block(Block::default().borders(Borders::ALL).title("Content"))
         .wrap(Wrap { trim: false })
         .scroll((app.view_log_scroll, 0));
-    frame.render_widget(log_content, chunks[1]);
+    frame.render_widget(log_content, chunks[2]);
 
     // Help bar
     let is_pinned = app.is_pinned(path);
@@ -441,6 +477,10 @@ pub fn render_view_log(frame: &mut Frame, app: &App, area: Rect, path: &std::pat
     let help_text = vec![
         Span::styled("↑↓", Style::default().fg(Color::Yellow)),
         Span::raw(" Scroll  "),
+        Span::styled("Tab", Style::default().fg(Color::Yellow)),
+        Span::raw(" Next tag  "),
+        Span::styled("Enter", Style::default().fg(Color::Yellow)),
+        Span::raw(" View tag logs  "),
         Span::styled("p", Style::default().fg(Color::Yellow)),
         Span::raw(pin_text),
         Span::styled("ESC", Style::default().fg(Color::Yellow)),
@@ -448,13 +488,32 @@ pub fn render_view_log(frame: &mut Frame, app: &App, area: Rect, path: &std::pat
     ];
     let help = Paragraph::new(Line::from(help_text))
         .block(Block::default().borders(Borders::ALL));
-    frame.render_widget(help, chunks[2]);
+    frame.render_widget(help, chunks[3]);
 }
 
-fn word_style(word: &str) -> Style {
-    if word.starts_with('#') {
+fn word_style_with_selection(word: &str, selected_tag: &Option<(String, bool)>) -> Style {
+    // Check if this word is a tag
+    if word.starts_with('#') && word.len() > 1 {
+        let tag_name = word[1..].trim_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '_');
+        if let Some((ref sel_name, is_project)) = selected_tag {
+            if *is_project && tag_name.eq_ignore_ascii_case(sel_name) {
+                return Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Green)
+                    .add_modifier(Modifier::BOLD);
+            }
+        }
         Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
-    } else if word.starts_with('@') {
+    } else if word.starts_with('@') && word.len() > 1 {
+        let tag_name = word[1..].trim_matches(|c: char| !c.is_alphanumeric() && c != '-' && c != '_');
+        if let Some((ref sel_name, is_project)) = selected_tag {
+            if !*is_project && tag_name.eq_ignore_ascii_case(sel_name) {
+                return Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Blue)
+                    .add_modifier(Modifier::BOLD);
+            }
+        }
         Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD)
     } else if word.starts_with("[]") {
         Style::default().fg(Color::Magenta)
@@ -464,3 +523,4 @@ fn word_style(word: &str) -> Style {
         Style::default()
     }
 }
+

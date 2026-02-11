@@ -147,7 +147,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                     Screen::LogEntry => handle_log_entry_input(app, key.code, key.modifiers)?,
                     Screen::TodoList => handle_todo_list_input(app, key.code)?,
                     Screen::LogList => handle_log_list_input(app, key.code)?,
-                    Screen::ViewLog(_) => handle_view_log_input(app, key.code)?,
+                    Screen::ViewLog(_) => handle_view_log_input(app, key.code, key.modifiers)?,
                     Screen::ProjectList => handle_project_list_input(app, key.code)?,
                     Screen::ProjectDetails(_) => handle_project_details_input(app, key.code)?,
                     Screen::ProjectEdit(_) => handle_project_edit_input(app, key.code, key.modifiers)?,
@@ -717,7 +717,7 @@ fn handle_people_filter_input(app: &mut App, key: KeyCode) {
     }
 }
 
-fn handle_view_log_input(app: &mut App, key: KeyCode) -> Result<()> {
+fn handle_view_log_input(app: &mut App, key: KeyCode, modifiers: KeyModifiers) -> Result<()> {
     match key {
         KeyCode::Esc => {
             app.go_back();
@@ -738,6 +738,19 @@ fn handle_view_log_input(app: &mut App, key: KeyCode) -> Result<()> {
         }
         KeyCode::Char('p') => {
             app.toggle_pin_viewed_log()?;
+        }
+        KeyCode::Tab => {
+            if modifiers.contains(KeyModifiers::SHIFT) {
+                app.prev_view_log_tag();
+            } else {
+                app.next_view_log_tag();
+            }
+        }
+        KeyCode::BackTab => {
+            app.prev_view_log_tag();
+        }
+        KeyCode::Enter => {
+            app.show_logs_for_selected_tag()?;
         }
         _ => {}
     }

@@ -20,6 +20,13 @@ pub enum Screen {
     PersonEdit(Option<usize>), // None = new person, Some(idx) = edit existing
 }
 
+/// A tag (project or person) found in a viewed log
+#[derive(Debug, Clone, PartialEq)]
+pub struct ViewLogTag {
+    pub name: String,
+    pub is_project: bool, // true = project (#), false = person (@)
+}
+
 /// Main application state
 pub struct App {
     pub storage: Storage,
@@ -68,6 +75,8 @@ pub struct App {
 
     // View log state
     pub view_log_scroll: u16,
+    pub view_log_tags: Vec<ViewLogTag>, // Tags found in the viewed log
+    pub view_log_tag_selected: Option<usize>, // Currently highlighted tag index
 
     // Todo filter editing state
     pub todo_filter_panel: TodoFilterPanel,
@@ -217,6 +226,8 @@ impl App {
             filtered_logs: Vec::new(),
 
             view_log_scroll: 0,
+            view_log_tags: Vec::new(),
+            view_log_tag_selected: None,
 
             todo_filter_panel: TodoFilterPanel::None,
             todo_filter_project_selected: 0,
@@ -443,9 +454,25 @@ impl App {
     pub fn view_selected_log(&mut self) {
         if let Some(log) = self.filtered_logs.get(self.log_selected) {
             let path = log.file_path.clone();
-            self.view_log_scroll = 0;
-            self.go_to_screen(Screen::ViewLog(path));
+            let projects = log.projects.clone();
+            let people = log.people.clone();
+            self.setup_view_log(path, &projects, &people);
         }
+    }
+
+    /// Helper to set up the view log screen with tags
+    fn setup_view_log(&mut self, path: PathBuf, projects: &[String], people: &[String]) {
+        self.view_log_scroll = 0;
+        self.view_log_tag_selected = None;
+
+        // Build list of tags (projects first, then people)
+        self.view_log_tags = projects
+            .iter()
+            .map(|p| ViewLogTag { name: p.clone(), is_project: true })
+            .chain(people.iter().map(|p| ViewLogTag { name: p.clone(), is_project: false }))
+            .collect();
+
+        self.go_to_screen(Screen::ViewLog(path));
     }
 
     /// Start editing the selected log from the log list
@@ -470,8 +497,9 @@ impl App {
     pub fn view_todo_log(&mut self) {
         if let Some(todo) = self.filtered_todos.get(self.todo_selected) {
             let path = todo.log_path.clone();
-            self.view_log_scroll = 0;
-            self.go_to_screen(Screen::ViewLog(path));
+            let projects = todo.projects.clone();
+            let people = todo.people.clone();
+            self.setup_view_log(path, &projects, &people);
         }
     }
 
@@ -515,9 +543,56 @@ impl App {
     pub fn view_project_details_log(&mut self) {
         if let Some(log) = self.project_details_logs.get(self.project_details_log_selected) {
             let path = log.file_path.clone();
-            self.view_log_scroll = 0;
-            self.go_to_screen(Screen::ViewLog(path));
+            let projects = log.projects.clone();
+            let people = log.people.clone();
+            self.setup_view_log(path, &projects, &people);
         }
+    }
+
+    /// Cycle to the next tag in the viewed log
+    pub fn next_view_log_tag(&mut self) {
+        if self.view_log_tags.is_empty() {
+            return;
+        }
+        self.view_log_tag_selected = Some(match self.view_log_tag_selected {
+            None => 0,
+            Some(i) => (i + 1) % self.view_log_tags.len(),
+        });
+    }
+
+    /// Cycle to the previous tag in the viewed log
+    pub fn prev_view_log_tag(&mut self) {
+        if self.view_log_tags.is_empty() {
+            return;
+        }
+        self.view_log_tag_selected = Some(match self.view_log_tag_selected {
+            None => self.view_log_tags.len() - 1,
+            Some(0) => self.view_log_tags.len() - 1,
+            Some(i) => i - 1,
+        });
+    }
+
+    /// Show logs for the currently selected tag in the viewed log
+    pub fn show_logs_for_selected_tag(&mut self) -> Result<()> {
+        if let Some(idx) = self.view_log_tag_selected {
+            if let Some(tag) = self.view_log_tags.get(idx) {
+                // Load all logs
+                self.logs = self.storage.load_all_logs()?;
+
+                // Set up filter for this tag
+                self.log_filter = LogFilter::default();
+                if tag.is_project {
+                    self.log_filter.projects = vec![tag.name.clone()];
+                } else {
+                    self.log_filter.people = vec![tag.name.clone()];
+                }
+
+                self.apply_log_filter();
+                self.log_selected = 0;
+                self.go_to_screen(Screen::LogList);
+            }
+        }
+        Ok(())
     }
 
     /// Show projects and go to project list screen
@@ -899,8 +974,9 @@ impl App {
     pub fn view_person_details_log(&mut self) {
         if let Some(log) = self.person_details_logs.get(self.person_details_log_selected) {
             let path = log.file_path.clone();
-            self.view_log_scroll = 0;
-            self.go_to_screen(Screen::ViewLog(path));
+            let projects = log.projects.clone();
+            let people = log.people.clone();
+            self.setup_view_log(path, &projects, &people);
         }
     }
 
