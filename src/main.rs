@@ -9,10 +9,32 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
+use std::collections::HashSet;
 use std::io;
+use storage::Storage;
 use ui::app::{App, LogFilterPanel, Screen, TodoFilterPanel};
 
 fn main() -> Result<()> {
+    // Check for command line arguments
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.len() > 1 {
+        match args[1].as_str() {
+            "--orphaned" => {
+                return find_orphaned_projects();
+            }
+            "--help" | "-h" => {
+                print_help();
+                return Ok(());
+            }
+            _ => {
+                eprintln!("Unknown option: {}", args[1]);
+                print_help();
+                std::process::exit(1);
+            }
+        }
+    }
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -35,6 +57,59 @@ fn main() -> Result<()> {
 
     if let Err(err) = res {
         eprintln!("Error: {:?}", err);
+    }
+
+    Ok(())
+}
+
+fn print_help() {
+    println!("todo-log - A terminal application for managing projects and todos through daily logs");
+    println!();
+    println!("USAGE:");
+    println!("    todo-log [OPTIONS]");
+    println!();
+    println!("OPTIONS:");
+    println!("    --orphaned    Find projects referenced in logs but not defined in projects.yml");
+    println!("    --help, -h    Show this help message");
+}
+
+fn find_orphaned_projects() -> Result<()> {
+    let storage = Storage::new()?;
+
+    // Load defined projects
+    let defined_projects: HashSet<String> = storage
+        .load_projects()?
+        .into_iter()
+        .map(|p| p.name.to_lowercase())
+        .collect();
+
+    // Load all logs and collect referenced projects
+    let logs = storage.load_all_logs()?;
+    let mut referenced_projects: HashSet<String> = HashSet::new();
+
+    for log in &logs {
+        for project in &log.projects {
+            referenced_projects.insert(project.to_lowercase());
+        }
+    }
+
+    // Find orphaned projects (referenced but not defined)
+    let mut orphaned: Vec<String> = referenced_projects
+        .difference(&defined_projects)
+        .cloned()
+        .collect();
+    orphaned.sort();
+
+    if orphaned.is_empty() {
+        println!("No orphaned projects found.");
+    } else {
+        println!("Orphaned projects (referenced in logs but not defined in projects.yml):");
+        println!();
+        for project in &orphaned {
+            println!("  #{}", project);
+        }
+        println!();
+        println!("Total: {} orphaned project(s)", orphaned.len());
     }
 
     Ok(())
