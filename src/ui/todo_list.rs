@@ -211,7 +211,7 @@ fn render_project_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Projects (↑↓ navigate, x toggle, ESC close)")
+                .title("Projects (↑↓ x toggle, c clear, ESC close)")
                 .border_style(Style::default().fg(Color::Yellow)),
         )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
@@ -257,7 +257,7 @@ fn render_people_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("People (↑↓ navigate, x toggle, ESC close)")
+                .title("People (↑↓ x toggle, c clear, ESC close)")
                 .border_style(Style::default().fg(Color::Yellow)),
         )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));

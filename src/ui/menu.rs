@@ -56,10 +56,30 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         .alignment(Alignment::Left);
     frame.render_widget(menu, chunks[1]);
 
-    // Status bar
-    let status_text = app.status_message.as_deref().unwrap_or("Ready");
-    let status = Paragraph::new(status_text)
-        .style(Style::default().fg(Color::Gray))
+    // Status bar with stats
+    let status_line = if let Some(ref msg) = app.status_message {
+        Line::from(vec![Span::styled(msg.as_str(), Style::default().fg(Color::Yellow))])
+    } else {
+        // Show stats
+        let log_count = app.storage.load_all_logs().map(|l| l.len()).unwrap_or(0);
+        let todos = app.storage.load_all_todos().unwrap_or_default();
+        let open_todos = todos.iter().filter(|t| !t.completed).count();
+        let pinned_count = app.pins.len();
+
+        Line::from(vec![
+            Span::styled("📝 ", Style::default()),
+            Span::styled(format!("{}", log_count), Style::default().fg(Color::Cyan)),
+            Span::styled(" logs  ", Style::default().fg(Color::Gray)),
+            Span::styled("☐ ", Style::default()),
+            Span::styled(format!("{}", open_todos), Style::default().fg(Color::Yellow)),
+            Span::styled(" open todos  ", Style::default().fg(Color::Gray)),
+            Span::styled("📌 ", Style::default()),
+            Span::styled(format!("{}", pinned_count), Style::default().fg(Color::Magenta)),
+            Span::styled(" pinned", Style::default().fg(Color::Gray)),
+        ])
+    };
+
+    let status = Paragraph::new(status_line)
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(status, chunks[2]);
 }

@@ -504,6 +504,12 @@ fn handle_todo_project_filter_input(app: &mut App, key: KeyCode) {
             }
             app.todo_selected = 0;
         }
+        KeyCode::Char('c') => {
+            // Clear all project filters
+            app.todo_filter.projects.clear();
+            app.apply_todo_filter();
+            app.todo_selected = 0;
+        }
         _ => {}
     }
 }
@@ -531,6 +537,12 @@ fn handle_todo_people_filter_input(app: &mut App, key: KeyCode) {
             if let Some(person) = all_people.get(app.todo_filter_people_selected) {
                 app.toggle_todo_filter_person(person);
             }
+            app.todo_selected = 0;
+        }
+        KeyCode::Char('c') => {
+            // Clear all people filters
+            app.todo_filter.people.clear();
+            app.apply_todo_filter();
             app.todo_selected = 0;
         }
         _ => {}
@@ -629,6 +641,15 @@ fn handle_date_filter_input(app: &mut App, key: KeyCode, is_start: bool) {
             // Switch to end date
             app.log_filter_panel = LogFilterPanel::EndDate;
         }
+        KeyCode::Char('c') => {
+            // Clear both date filters
+            app.start_date_input.clear();
+            app.end_date_input.clear();
+            app.log_filter.start_date = None;
+            app.log_filter.end_date = None;
+            app.apply_log_filter();
+            app.log_selected = 0;
+        }
         KeyCode::Enter => {
             // Apply the current date and close
             if is_start {
@@ -685,6 +706,12 @@ fn handle_project_filter_input(app: &mut App, key: KeyCode) {
                 app.toggle_log_filter_project(project);
             }
         }
+        KeyCode::Char('c') => {
+            // Clear all project filters
+            app.log_filter.projects.clear();
+            app.apply_log_filter();
+            app.log_selected = 0;
+        }
         _ => {}
     }
 }
@@ -713,6 +740,12 @@ fn handle_people_filter_input(app: &mut App, key: KeyCode) {
                 app.toggle_log_filter_person(person);
             }
         }
+        KeyCode::Char('c') => {
+            // Clear all people filters
+            app.log_filter.people.clear();
+            app.apply_log_filter();
+            app.log_selected = 0;
+        }
         _ => {}
     }
 }
@@ -738,6 +771,9 @@ fn handle_view_log_input(app: &mut App, key: KeyCode, modifiers: KeyModifiers) -
         }
         KeyCode::Char('p') => {
             app.toggle_pin_viewed_log()?;
+        }
+        KeyCode::Char('w') => {
+            app.edit_viewed_log()?;
         }
         KeyCode::Tab => {
             if modifiers.contains(KeyModifiers::SHIFT) {
@@ -830,6 +866,12 @@ fn handle_project_group_filter_input(app: &mut App, key: KeyCode) {
             if let Some(group) = all_groups.get(app.project_filter_group_selected) {
                 app.toggle_project_filter_group(group);
             }
+            app.project_selected = 0;
+        }
+        KeyCode::Char('c') => {
+            // Clear all group filters
+            app.project_filter_groups.clear();
+            app.apply_project_filter();
             app.project_selected = 0;
         }
         _ => {}

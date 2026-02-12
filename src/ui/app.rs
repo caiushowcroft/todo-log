@@ -526,6 +526,24 @@ impl App {
         Ok(())
     }
 
+    /// Edit the currently viewed log
+    pub fn edit_viewed_log(&mut self) -> Result<()> {
+        if let Screen::ViewLog(ref path) = self.screen {
+            let path = path.clone();
+            if let Some(log) = self.storage.load_log_by_path(&path)? {
+                self.current_log = log;
+                self.log_cursor_pos = self.current_log.content.chars().count();
+                self.log_scroll = 0;
+                self.attachments.clear();
+                self.log_editing_path = Some(path);
+                self.autocomplete_suggestions.clear();
+                self.autocomplete_active = false;
+                self.go_to_screen(Screen::LogEntry);
+            }
+        }
+        Ok(())
+    }
+
     /// Toggle pin status for a log path
     fn toggle_pin(&mut self, path: &PathBuf) -> Result<()> {
         if let Some(pos) = self.pins.iter().position(|p| p == path) {

@@ -237,23 +237,47 @@ fn render_file_browser(frame: &mut Frame, app: &App, area: Rect) {
 fn render_editor(frame: &mut Frame, app: &mut App, area: Rect) {
     let content = &app.current_log.content;
 
-    // Calculate cursor line position first to determine scroll
-    let before_cursor: String = content.chars().take(app.log_cursor_pos).collect();
-    let lines_before: Vec<&str> = before_cursor.split('\n').collect();
-    let cursor_y = (lines_before.len() - 1) as u16;
-    let cursor_x = lines_before.last().map(|l| l.chars().count()).unwrap_or(0) as u16;
-
-    // Calculate visible height (inner area minus borders)
+    // Calculate visible area (inner area minus borders)
     let inner = area.inner(ratatui::layout::Margin { vertical: 1, horizontal: 1 });
+    let visible_width = inner.width as usize;
     let visible_height = inner.height;
 
+    // Calculate cursor position accounting for text wrapping
+    // Count visual lines and find cursor position
+    let mut visual_line = 0u16;
+    let mut cursor_visual_y = 0u16;
+    let mut cursor_visual_x = 0u16;
+
+    for (line_idx, line) in content.split('\n').enumerate() {
+        let line_char_count = line.chars().count();
+        let wrapped_lines = if visible_width > 0 && line_char_count > 0 {
+            ((line_char_count - 1) / visible_width + 1) as u16
+        } else {
+            1
+        };
+
+        // Check if cursor is on this line
+        let lines_before_this: String = content.split('\n').take(line_idx).collect::<Vec<_>>().join("\n");
+        let char_offset_start = if line_idx == 0 { 0 } else { lines_before_this.chars().count() + 1 };
+        let char_offset_end = char_offset_start + line_char_count;
+
+        if app.log_cursor_pos >= char_offset_start && app.log_cursor_pos <= char_offset_end {
+            let pos_in_line = app.log_cursor_pos - char_offset_start;
+            let wrapped_line_offset = if visible_width > 0 { pos_in_line / visible_width } else { 0 };
+            let x_in_wrapped_line = if visible_width > 0 { pos_in_line % visible_width } else { pos_in_line };
+
+            cursor_visual_y = visual_line + wrapped_line_offset as u16;
+            cursor_visual_x = x_in_wrapped_line as u16;
+        }
+
+        visual_line += wrapped_lines;
+    }
+
     // Adjust scroll to keep cursor visible
-    if cursor_y < app.log_scroll {
-        // Cursor is above visible area, scroll up
-        app.log_scroll = cursor_y;
-    } else if cursor_y >= app.log_scroll + visible_height {
-        // Cursor is below visible area, scroll down
-        app.log_scroll = cursor_y - visible_height + 1;
+    if cursor_visual_y < app.log_scroll {
+        app.log_scroll = cursor_visual_y;
+    } else if cursor_visual_y >= app.log_scroll + visible_height {
+        app.log_scroll = cursor_visual_y - visible_height + 1;
     }
 
     // Process content line by line for proper multi-line support
@@ -302,10 +326,10 @@ fn render_editor(frame: &mut Frame, app: &mut App, area: Rect) {
     // Only show cursor if file browser is not open and not editing timestamp
     if !app.file_browser_open && !app.timestamp_editing {
         // Cursor position relative to scroll
-        let visual_cursor_y = cursor_y.saturating_sub(app.log_scroll);
+        let visual_cursor_y = cursor_visual_y.saturating_sub(app.log_scroll);
 
         frame.set_cursor_position((
-            inner.x + cursor_x.min(inner.width.saturating_sub(1)),
+            inner.x + cursor_visual_x.min(inner.width.saturating_sub(1)),
             inner.y + visual_cursor_y.min(inner.height.saturating_sub(1)),
         ));
     }

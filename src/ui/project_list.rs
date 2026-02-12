@@ -119,7 +119,7 @@ fn render_group_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Groups (↑↓ navigate, x toggle, ESC close)")
+                .title("Groups (↑↓ x toggle, c clear, ESC close)")
                 .border_style(Style::default().fg(Color::Yellow)),
         )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));

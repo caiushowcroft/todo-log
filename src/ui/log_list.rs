@@ -159,7 +159,7 @@ fn render_date_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
 
     let outer_block = Block::default()
         .borders(Borders::ALL)
-        .title("Date Filter (YYYY-MM-DD)")
+        .title("Date Filter (YYYY-MM-DD, c clear)")
         .border_style(Style::default().fg(Color::Yellow));
     frame.render_widget(outer_block, popup_area);
 
@@ -240,7 +240,7 @@ fn render_project_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("Projects (↑↓ navigate, x toggle, ESC close)")
+                .title("Projects (↑↓ x toggle, c clear, ESC close)")
                 .border_style(Style::default().fg(Color::Yellow)),
         )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
@@ -286,7 +286,7 @@ fn render_people_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("People (↑↓ navigate, x toggle, ESC close)")
+                .title("People (↑↓ x toggle, c clear, ESC close)")
                 .border_style(Style::default().fg(Color::Yellow)),
         )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
@@ -477,6 +477,8 @@ pub fn render_view_log(frame: &mut Frame, app: &App, area: Rect, path: &std::pat
     let help_text = vec![
         Span::styled("↑↓", Style::default().fg(Color::Yellow)),
         Span::raw(" Scroll  "),
+        Span::styled("w", Style::default().fg(Color::Yellow)),
+        Span::raw(" Edit  "),
         Span::styled("Tab", Style::default().fg(Color::Yellow)),
         Span::raw(" Next tag  "),
         Span::styled("Enter", Style::default().fg(Color::Yellow)),
